@@ -1,5 +1,5 @@
-<<<<<<< HEAD
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# weather-decision-ai
+An AI-powered app that analyzes weather data and historical climate patterns to recommend the best time of year for construction projects in any city, helping reduce weather-related risks, delays, and costs.
 
 ## Getting Started
 
@@ -36,6 +36,5 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 =======
-# weather-decision-ai
-An AI-powered app that analyzes weather data and historical climate patterns to recommend the best time of year for construction projects in any city, helping reduce weather-related risks, delays, and costs.
->>>>>>> 1640d02426936a45e51c451322562ccf5aa2f708
+
+
