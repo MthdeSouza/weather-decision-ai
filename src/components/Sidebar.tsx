@@ -1,8 +1,12 @@
 "use client";
 
-import { signIn, signOut, useSession } from "next-auth/react";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+
+import { loginWithGoogle, logout } from "@/services/firebase/auth";
+import { auth } from "@/services/firebase/config";
 
 const navItems = [
   { label: "Home", href: "/" },
@@ -12,12 +16,40 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { data: session, status } = useSession();
-  const isAuthenticated = status === "authenticated";
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+      setUser(nextUser);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const isAuthenticated = Boolean(user);
 
   const visibleNavItems = navItems.filter(
     (item) => !item.protected || isAuthenticated,
   );
+
+  const handleLogin = async () => {
+    try {
+      await loginWithGoogle();
+      router.push("/");
+    } catch (error) {
+      console.error("Erro ao fazer login:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push("/");
+    } catch (error) {
+      console.error("Erro ao sair:", error);
+    }
+  };
 
   return (
     <aside className="w-64 border-r border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
@@ -55,11 +87,11 @@ export function Sidebar() {
         {isAuthenticated ? (
           <div className="space-y-3">
             <div className="text-sm text-slate-600 dark:text-slate-300">
-              {session?.user?.name ?? "Usuário autenticado"}
+              {user?.displayName ?? "Usuário autenticado"}
             </div>
             <button
               type="button"
-              onClick={() => signOut({ callbackUrl: "/" })}
+              onClick={handleLogout}
               className="cursor-pointer w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Sair
@@ -68,7 +100,7 @@ export function Sidebar() {
         ) : (
           <button
             type="button"
-            onClick={() => signIn("google", { callbackUrl: "/" })}
+            onClick={handleLogin}
             className="cursor-pointer w-full rounded-xl bg-sky-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-500"
           >
             Entrar com Google

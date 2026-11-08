@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 
-import { SessionProvider } from "next-auth/react";
-
 import { Sidebar } from "@/components/Sidebar";
 
 import "./globals.css";
@@ -18,12 +16,10 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className="bg-slate-100 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
-        <SessionProvider>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <main className="flex-1">{children}</main>
-          </div>
-        </SessionProvider>
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <main className="flex-1">{children}</main>
+        </div>
       </body>
     </html>
   );
