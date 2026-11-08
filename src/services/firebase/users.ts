@@ -1,6 +1,31 @@
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
+import type { UserRole } from "@/types/user";
+
 import { db } from "./config";
+
+export type FirebaseUserProfile = {
+  uid: string;
+  name: string;
+  email: string;
+  photoURL?: string;
+  provider?: string;
+  role: UserRole;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+  lastLoginAt?: unknown;
+};
+
+export const getUserProfileByUid = async (uid: string) => {
+  const userRef = doc(db, "users", uid);
+  const snapshot = await getDoc(userRef);
+
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  return snapshot.data() as FirebaseUserProfile;
+};
 
 export const getOrCreateUser = async (user: {
   uid: string;
@@ -31,5 +56,5 @@ export const getOrCreateUser = async (user: {
 
   const savedUser = (await getDoc(userRef)).data() ?? payload;
 
-  return savedUser;
+  return savedUser as FirebaseUserProfile;
 };

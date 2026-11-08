@@ -16,7 +16,14 @@ export function middleware(request: Request) {
     return NextResponse.next();
   }
 
-  const isProtectedPath = pathname === "/future" || pathname === "/ai-chat";
+  const protectedRoutes = [
+    "/future",
+    "/ai-chat",
+    "/meus-chamados",
+    "/analise-chamados",
+  ];
+
+  const isProtectedPath = protectedRoutes.includes(pathname);
   const sessionCookie = request.headers.get("cookie") ?? "";
   const hasAuthCookie = sessionCookie
     .split(";")

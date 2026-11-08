@@ -1,0 +1,74 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isApproverOrAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'approver' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    function userProfile(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || isAdmin()
+      );
+
+      allow create: if isAuthenticated()
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.role == 'basic';
+
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /tickets/{ticketId} {
+      function isOwner() {
+        return isAuthenticated() && resource.data.createdBy.uid == request.auth.uid;
+      }
+
+      allow get: if isAuthenticated();
+      allow list: if isAuthenticated();
+
+      allow create: if isAuthenticated()
+        && request.resource.data.createdBy.uid == request.auth.uid
+        && request.resource.data.createdBy.email is string
+        && request.resource.data.createdBy.name is string
+        && request.resource.data.construction is map
+        && request.resource.data.construction.city is string
+        && request.resource.data.construction.state is string
+        && request.resource.data.status in ['pending_approval', 'pending_ai_analysis'];
+
+      allow update: if isAuthenticated() && (
+        (
+          isOwner() &&
+          request.resource.data.createdBy.uid == resource.data.createdBy.uid
+        ) ||
+        (
+          isApproverOrAdmin() &&
+          request.resource.data.createdBy.uid == resource.data.createdBy.uid &&
+          (
+            (resource.data.status == 'pending_approval' && request.resource.data.status in ['pending_approval', 'pending_ai_analysis', 'rejected']) ||
+            (resource.data.status == 'pending_ai_analysis' && request.resource.data.status == 'pending_ai_analysis') ||
+            (resource.data.status == 'rejected' && request.resource.data.status == 'rejected')
+          )
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+  }
+}

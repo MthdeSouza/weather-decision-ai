@@ -7,9 +7,23 @@ import { useEffect, useState } from "react";
 
 import { loginWithGoogle, logout } from "@/services/firebase/auth";
 import { auth } from "@/services/firebase/config";
+import { getUserProfileByUid } from "@/services/firebase/users";
+import type { UserRole } from "@/types/user";
 
-const navItems = [
+const navItems: Array<{
+  label: string;
+  href: string;
+  protected?: boolean;
+  allowedRoles?: UserRole[];
+}> = [
   { label: "Home", href: "/" },
+  { label: "Meus chamados", href: "/meus-chamados", protected: true },
+  {
+    label: "Análise de chamados",
+    href: "/analise-chamados",
+    protected: true,
+    allowedRoles: ["approver", "admin"],
+  },
   { label: "Futuro", href: "/future", protected: true },
   { label: "AIChat", href: "/ai-chat", protected: true },
 ];
@@ -18,10 +32,19 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<UserRole>("basic");
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
+
+      if (!nextUser) {
+        setRole("basic");
+        return;
+      }
+
+      const profile = await getUserProfileByUid(nextUser.uid);
+      setRole((profile?.role ?? "basic") as UserRole);
     });
 
     return () => unsubscribe();
@@ -29,9 +52,21 @@ export function Sidebar() {
 
   const isAuthenticated = Boolean(user);
 
-  const visibleNavItems = navItems.filter(
-    (item) => !item.protected || isAuthenticated,
-  );
+  const visibleNavItems = navItems.filter((item) => {
+    if (!item.protected) {
+      return true;
+    }
+
+    if (!isAuthenticated) {
+      return false;
+    }
+
+    if (!item.allowedRoles) {
+      return true;
+    }
+
+    return item.allowedRoles.includes(role);
+  });
 
   const handleLogin = async () => {
     try {
