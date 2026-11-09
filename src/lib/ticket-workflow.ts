@@ -9,6 +9,11 @@ const PROCESSABLE_STATUSES: TicketStatus[] = [
 ];
 
 export const PROCESSING_LOCK_TIMEOUT_MS = 15 * 60 * 1000;
+export const MAX_PENDING_APPROVAL_TICKETS = 5;
+
+export function canCreatePendingApprovalTicket(currentCount: number) {
+  return currentCount < MAX_PENDING_APPROVAL_TICKETS;
+}
 
 export function isProcessingRunStale(
   startedAt: unknown,

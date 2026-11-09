@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { TicketForm } from "@/components/TicketForm";
 import { TicketList } from "@/components/TicketList";
 import { TICKET_STATUS_LABELS } from "@/constants/tickets";
+import { MAX_PENDING_APPROVAL_TICKETS } from "@/lib/ticket-workflow";
 import { auth } from "@/services/firebase/config";
 import { filterAndSortTickets, getMyTickets } from "@/services/tickets";
 import type { Ticket, TicketStatus } from "@/types/ticket";
@@ -46,6 +47,11 @@ export default function MyTicketsPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const pendingApprovalCount = tickets.filter(
+    (ticket) => ticket.status === "pending_approval",
+  ).length;
+  const reachedPendingApprovalLimit =
+    pendingApprovalCount >= MAX_PENDING_APPROVAL_TICKETS;
 
   const loadTickets = async () => {
     setLoading(true);
@@ -281,12 +287,26 @@ export default function MyTicketsPage() {
               <button
                 type="button"
                 onClick={() => setIsModalOpen(true)}
-                className="cursor-pointer inline-flex items-center justify-center rounded-lg border border-sky-200 bg-sky-50 text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:bg-sky-500/20 dark:disabled:border-slate-700 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
-                // className="cursor-pointer inline-flex w-fit items-center justify-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-500"
+                disabled={loading || reachedPendingApprovalLimit}
+                title={
+                  reachedPendingApprovalLimit
+                    ? `Limite de ${MAX_PENDING_APPROVAL_TICKETS} chamados aguardando aprovação atingido`
+                    : undefined
+                }
+                className="cursor-pointer inline-flex items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:bg-sky-500/20 dark:disabled:border-slate-700 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
               >
                 Novo chamado
               </button>
             </div>
+            {reachedPendingApprovalLimit ? (
+              <p
+                role="status"
+                className="text-sm text-amber-700 dark:text-amber-300"
+              >
+                Você tem {pendingApprovalCount} chamados aguardando aprovação.
+                Aguarde a análise de pelo menos um antes de abrir outro.
+              </p>
+            ) : null}
           </div>
         </section>
 

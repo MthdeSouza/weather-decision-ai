@@ -4,18 +4,14 @@ import {
   getDoc,
   getDocs,
   query,
-  serverTimestamp,
-  setDoc,
   where,
 } from "firebase/firestore";
 
 import { auth, db } from "@/services/firebase/config";
 import { getUserProfileByUid } from "@/services/firebase/users";
-import { initialTicketStatus } from "@/lib/ticket-workflow";
 import type {
   Ticket,
   TicketCreateInput,
-  TicketStatus,
 } from "@/types/ticket";
 import type { UserRole } from "@/types/user";
 
@@ -61,50 +57,35 @@ export async function getCurrentAuthUser() {
 }
 
 export async function createTicket(input: TicketCreateInput) {
-  const user = await getCurrentAuthUser();
+  const user = auth.currentUser;
 
   if (!user) {
     throw new Error("Usuário não autenticado.");
   }
 
-  const ticketRef = doc(ticketsCollection);
-  const status: TicketStatus = initialTicketStatus(user.role);
-
-  const payload: Ticket = {
-    id: ticketRef.id,
-    createdBy: {
-      uid: user.uid,
-      name: user.name,
-      email: user.email,
+  const token = await user.getIdToken();
+  const response = await fetch("/api/tickets", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
-    construction: {
-      city: input.city.trim(),
-      state: input.state.trim(),
-      propertyType: input.propertyType,
-      constructionType: input.constructionType,
-      type: input.propertyType,
-      startDate: input.startDate,
-      estimatedMonths: Number(input.estimatedMonths),
-      builtArea: Number(input.builtArea),
-    },
-    status,
-    approval: {
-      approvedBy: null,
-      approvedAt: null,
-      rejectedBy: null,
-      rejectedAt: null,
-      rejectionReason: null,
-    },
-    iaAnalysis: null,
-    aiAnalysisMeta: null,
-    climateContext: null,
-    createdAt: serverTimestamp() as never,
-    updatedAt: serverTimestamp() as never,
+    body: JSON.stringify(input),
+  });
+  const payload = (await response.json()) as {
+    error?: string;
+    ticketId?: string;
   };
 
-  await setDoc(ticketRef, payload);
+  if (!response.ok) {
+    throw new Error(payload.error ?? "Não foi possível abrir o chamado.");
+  }
 
-  return payload;
+  if (!payload.ticketId) {
+    throw new Error("O servidor não confirmou a criação do chamado.");
+  }
+
+  return payload.ticketId;
 }
 
 export async function getMyTickets() {

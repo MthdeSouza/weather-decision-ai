@@ -37,6 +37,7 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     async function loadStates() {
@@ -181,6 +182,7 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
 
     setIsSubmitting(true);
     setSuccessMessage("");
+    setErrorMessage("");
 
     try {
       await createTicket(form);
@@ -188,7 +190,7 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
       setForm(initialState);
       onCreated?.();
     } catch (error) {
-      setSuccessMessage(
+      setErrorMessage(
         error instanceof Error
           ? error.message
           : "Não foi possível abrir o chamado.",
@@ -439,6 +441,14 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
       {successMessage ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300">
           {successMessage}
+        </div>
+      ) : null}
+      {errorMessage ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300"
+        >
+          {errorMessage}
         </div>
       ) : null}
 

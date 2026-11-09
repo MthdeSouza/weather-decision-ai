@@ -12,10 +12,12 @@ import {
   canAccessRole,
   canApproveTicket,
   canBeginTicketProcessing,
+  canCreatePendingApprovalTicket,
   canRejectTicket,
   initialTicketStatus,
   isProcessingRunStale,
   isPrivilegedRole,
+  MAX_PENDING_APPROVAL_TICKETS,
   PROCESSING_LOCK_TIMEOUT_MS,
 } from "../lib/ticket-workflow";
 import type { Ticket } from "../types/ticket";
@@ -568,6 +570,13 @@ describe("getWeatherSummary", () => {
     assert.equal(canBeginTicketProcessing("pending_approval"), false);
     assert.equal(canBeginTicketProcessing("processing"), false);
     assert.equal(canBeginTicketProcessing("archived"), false);
+  });
+
+  it("limits users to five tickets awaiting approval", () => {
+    assert.equal(MAX_PENDING_APPROVAL_TICKETS, 5);
+    assert.equal(canCreatePendingApprovalTicket(4), true);
+    assert.equal(canCreatePendingApprovalTicket(5), false);
+    assert.equal(canCreatePendingApprovalTicket(6), false);
   });
 
   it("only allows recovering a processing run after its lease expires", () => {
