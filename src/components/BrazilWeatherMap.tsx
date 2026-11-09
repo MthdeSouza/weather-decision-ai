@@ -235,205 +235,190 @@ export function BrazilWeatherMap() {
   }, [selectedUf, statesWeather]);
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
-            Brasil em tempo real
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-50">
-            Dashboard
-          </h1>
+    <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-100 via-white to-sky-50 p-3 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900">
+          <svg
+            viewBox="0 0 520 500"
+            className="h-[420px] w-full"
+            aria-label="Mapa do Brasil com clima por capital"
+          >
+            <g className="model-davi">
+              <rect x="0" y="0" width="520" height="500" fill="transparent" />
+
+              {BRAZIL_STATES.map((state) => {
+                const isSelected = selectedUf === state.uf;
+                const geoPath = STATE_SHAPES[state.uf];
+                const label = STATE_LABELS[state.uf];
+                const currentState = statesWeather.find(
+                  (item) => item.uf === state.uf,
+                );
+                const temp = currentState?.temperature ?? 0;
+                const fill = isSelected
+                  ? temp > 30
+                    ? "#f97316"
+                    : temp < 18
+                      ? "#38bdf8"
+                      : "#22c55e"
+                  : "rgba(148, 163, 184, 0.72)";
+
+                return (
+                  <g
+                    key={state.uf}
+                    onClick={() => setSelectedUf(state.uf)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    {geoPath ? (
+                      <path
+                        d={geoPath}
+                        fill={fill}
+                        stroke={
+                          isSelected ? "#0f172a" : "rgba(15, 23, 42, 0.5)"
+                        }
+                        strokeWidth={isSelected ? 2.5 : 1.1}
+                        opacity={isSelected ? 1 : 0.9}
+                      />
+                    ) : null}
+
+                    {label ? (
+                      <text
+                        x={label.x}
+                        y={label.y}
+                        fontSize="11"
+                        fontWeight={700}
+                        fill={isSelected ? "#0f172a" : "#0f172a"}
+                        textAnchor="middle"
+                      >
+                        {state.uf}
+                      </text>
+                    ) : null}
+                  </g>
+                );
+              })}
+            </g>
+          </svg>
         </div>
-      </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-100 via-white to-sky-50 p-3 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900">
-            <svg
-              viewBox="0 0 520 500"
-              className="h-[420px] w-full"
-              aria-label="Mapa do Brasil com clima por capital"
-            >
-              <g className="model-davi">
-                <rect x="0" y="0" width="520" height="500" fill="transparent" />
-
-                {BRAZIL_STATES.map((state) => {
-                  const isSelected = selectedUf === state.uf;
-                  const geoPath = STATE_SHAPES[state.uf];
-                  const label = STATE_LABELS[state.uf];
-                  const currentState = statesWeather.find(
-                    (item) => item.uf === state.uf,
-                  );
-                  const temp = currentState?.temperature ?? 0;
-                  const fill = isSelected
-                    ? temp > 30
-                      ? "#f97316"
-                      : temp < 18
-                        ? "#38bdf8"
-                        : "#22c55e"
-                    : "rgba(148, 163, 184, 0.72)";
-
-                  return (
-                    <g
-                      key={state.uf}
-                      onClick={() => setSelectedUf(state.uf)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      {geoPath ? (
-                        <path
-                          d={geoPath}
-                          fill={fill}
-                          stroke={
-                            isSelected ? "#0f172a" : "rgba(15, 23, 42, 0.5)"
-                          }
-                          strokeWidth={isSelected ? 2.5 : 1.1}
-                          opacity={isSelected ? 1 : 0.9}
-                        />
-                      ) : null}
-
-                      {label ? (
-                        <text
-                          x={label.x}
-                          y={label.y}
-                          fontSize="11"
-                          fontWeight={700}
-                          fill={isSelected ? "#0f172a" : "#0f172a"}
-                          textAnchor="middle"
-                        >
-                          {state.uf}
-                        </text>
-                      ) : null}
-                    </g>
-                  );
-                })}
-              </g>
-            </svg>
-          </div>
-
-          {selectedState && (
-            <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
-                    {selectedState.uf}
-                  </p>
-                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
-                    {selectedState.name}
-                  </h3>
-                </div>
-                <div className="rounded-full bg-sky-100 px-2 py-1 text-sm font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
-                  {selectedState.temperature.toFixed(1)}°C
-                </div>
+        {selectedState && (
+          <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
+                  {selectedState.uf}
+                </p>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
+                  {selectedState.name}
+                </h3>
               </div>
-
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                Capital:{" "}
-                <span className="font-medium text-slate-800 dark:text-slate-100">
-                  {selectedState.city}
-                </span>
-              </p>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                {selectedState.description}
-              </p>
-
-              <div className="mt-3 grid grid-cols-2 gap-2 text-md text-slate-600 dark:text-slate-300">
-                <div className="rounded-xl bg-white px-2 py-1 dark:bg-slate-900">
-                  Umidade: {selectedState.humidity}%
-                </div>
-                <div className="rounded-xl bg-white px-2 py-1 dark:bg-slate-900">
-                  Vento: {selectedState.wind} km/h
-                </div>
+              <div className="rounded-full bg-sky-100 px-2 py-1 text-sm font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                {selectedState.temperature.toFixed(1)}°C
               </div>
             </div>
+
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Capital:{" "}
+              <span className="font-medium text-slate-800 dark:text-slate-100">
+                {selectedState.city}
+              </span>
+            </p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {selectedState.description}
+            </p>
+
+            <div className="mt-3 grid grid-cols-2 gap-2 text-md text-slate-600 dark:text-slate-300">
+              <div className="rounded-xl bg-white px-2 py-1 dark:bg-slate-900">
+                Umidade: {selectedState.humidity}%
+              </div>
+              <div className="rounded-xl bg-white px-2 py-1 dark:bg-slate-900">
+                Vento: {selectedState.wind} km/h
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+            Resumo por temperatura
+          </h2>
+          {isLoading && (
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              carregando...
+            </span>
           )}
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
-              Resumo por temperatura
-            </h2>
-            {isLoading && (
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                carregando...
-              </span>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            {[
-              {
-                key: "high",
-                label: "Acima de 30°C",
-                color: "bg-orange-500",
-                states: stateSummary.filter((state) => state.temperature > 30),
-              },
-              {
-                key: "mid",
-                label: "Entre 18°C e 30°C",
-                color: "bg-emerald-500",
-                states: stateSummary.filter(
-                  (state) => state.temperature >= 18 && state.temperature <= 30,
-                ),
-              },
-              {
-                key: "low",
-                label: "Abaixo de 18°C",
-                color: "bg-sky-500",
-                states: stateSummary.filter((state) => state.temperature < 18),
-              },
-            ].map((group) => (
-              <div
-                key={group.key}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/70"
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`h-2.5 w-2.5 rounded-full ${group.color}`}
-                    />
-                    <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                      {group.label}
-                    </h3>
-                  </div>
-                  <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                    {group.states.length} estados
-                  </span>
+        <div className="space-y-4">
+          {[
+            {
+              key: "high",
+              label: "Acima de 30°C",
+              color: "bg-orange-500",
+              states: stateSummary.filter((state) => state.temperature > 30),
+            },
+            {
+              key: "mid",
+              label: "Entre 18°C e 30°C",
+              color: "bg-emerald-500",
+              states: stateSummary.filter(
+                (state) => state.temperature >= 18 && state.temperature <= 30,
+              ),
+            },
+            {
+              key: "low",
+              label: "Abaixo de 18°C",
+              color: "bg-sky-500",
+              states: stateSummary.filter((state) => state.temperature < 18),
+            },
+          ].map((group) => (
+            <div
+              key={group.key}
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/70"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${group.color}`} />
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                    {group.label}
+                  </h3>
                 </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {group.states.length > 0 ? (
-                    group.states.map((state) => {
-                      const isSelected = selectedUf === state.uf;
-
-                      return (
-                        <button
-                          key={state.uf}
-                          type="button"
-                          onClick={() => setSelectedUf(state.uf)}
-                          className={[
-                            "rounded-full border px-2.5 py-1.5 text-xs font-medium transition cursor-pointer",
-                            isSelected
-                              ? "border-sky-500 bg-sky-100 text-sky-800 dark:border-sky-400 dark:bg-sky-500/10 dark:text-sky-200"
-                              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300",
-                          ].join(" ")}
-                        >
-                          {state.uf} · {state.city}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      Nenhum estado nesta faixa.
-                    </span>
-                  )}
-                </div>
+                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                  {group.states.length} estados
+                </span>
               </div>
-            ))}
-          </div>
+
+              <div className="flex flex-wrap gap-2">
+                {group.states.length > 0 ? (
+                  group.states.map((state) => {
+                    const isSelected = selectedUf === state.uf;
+
+                    return (
+                      <button
+                        key={state.uf}
+                        type="button"
+                        onClick={() => setSelectedUf(state.uf)}
+                        className={[
+                          "rounded-full border px-2.5 py-1.5 text-xs font-medium transition cursor-pointer",
+                          isSelected
+                            ? "border-sky-500 bg-sky-100 text-sky-800 dark:border-sky-400 dark:bg-sky-500/10 dark:text-sky-200"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300",
+                        ].join(" ")}
+                      >
+                        {state.uf} · {state.city}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Nenhum estado nesta faixa.
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-    </section>
+    </div>
   );
 }

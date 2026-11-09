@@ -68,6 +68,7 @@ export async function createTicket(input: TicketCreateInput) {
       propertyType: input.propertyType,
       constructionType: input.constructionType,
       type: input.propertyType,
+      startDate: input.startDate,
       estimatedMonths: Number(input.estimatedMonths),
       builtArea: Number(input.builtArea),
     },
@@ -79,6 +80,7 @@ export async function createTicket(input: TicketCreateInput) {
       rejectedAt: null,
       rejectionReason: null,
     },
+    iaAnalysis: null,
     createdAt: serverTimestamp() as never,
     updatedAt: serverTimestamp() as never,
   };

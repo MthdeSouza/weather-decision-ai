@@ -35,6 +35,7 @@ export interface TicketConstruction {
   propertyType: string;
   constructionType: string;
   type?: string;
+  startDate: string;
   estimatedMonths: number;
   builtArea: number;
 }
@@ -53,6 +54,7 @@ export interface Ticket {
   construction: TicketConstruction;
   status: TicketStatus;
   approval: TicketApproval;
+  iaAnalysis: string | null;
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
 }
@@ -63,6 +65,7 @@ export interface TicketCreateInput {
   propertyType: string;
   constructionType: string;
   type?: string;
+  startDate: string;
   estimatedMonths: number;
   builtArea: number;
 }

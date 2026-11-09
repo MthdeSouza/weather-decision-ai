@@ -12,6 +12,7 @@ const initialState: TicketCreateInput = {
   state: "",
   propertyType: "residential",
   constructionType: "masonry",
+  startDate: "",
   estimatedMonths: 0,
   builtArea: 0,
 };
@@ -102,6 +103,10 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
 
     if (!form.constructionType) {
       nextErrors.constructionType = "Selecione o tipo de construção.";
+    }
+
+    if (!form.startDate) {
+      nextErrors.startDate = "Informe a previsão de início da obra.";
     }
 
     if (
@@ -351,6 +356,21 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
             <p className="mt-1 text-xs text-rose-600">
               {errors.constructionType}
             </p>
+          ) : null}
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
+            Previsão de início da obra
+          </label>
+          <input
+            type="date"
+            value={form.startDate}
+            onChange={(event) => handleChange("startDate", event.target.value)}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          />
+          {errors.startDate ? (
+            <p className="mt-1 text-xs text-rose-600">{errors.startDate}</p>
           ) : null}
         </div>
 

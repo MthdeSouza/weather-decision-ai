@@ -277,7 +277,19 @@ export default function AnalysisPage() {
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <div className="mt-6 grid gap-4 md:grid-cols-4">
+                  <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-950">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                      Início da obra
+                    </p>
+                    <p className="mt-2 font-semibold text-slate-900 dark:text-slate-50">
+                      {selectedTicket.construction.startDate
+                        ? new Date(
+                            `${selectedTicket.construction.startDate}T00:00:00`,
+                          ).toLocaleDateString("pt-BR")
+                        : "-"}
+                    </p>
+                  </div>
                   <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-950">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
                       Prazo

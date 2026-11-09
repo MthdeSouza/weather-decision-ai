@@ -45,32 +45,37 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-slate-100 dark:bg-slate-950">
-      <BrazilWeatherMap />
-      {canSeePendingApproval ? (
-        <div className="mx-auto max-w-6xl px-4 pb-0 pt-6 ">
-          <div className="flex items-center justify-between rounded-2xl border border-sky-200 bg-sky-50 px-5 py-4 shadow-sm dark:border-sky-900 dark:bg-sky-950/40">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700 dark:text-sky-300">
-                Aprovação
-              </p>
-              <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
-                Chamados aguardando análise
-              </p>
-            </div>
-            <div
-              className={`text-3xl font-bold ${
-                (pendingApprovalCount ?? 0) > 10
-                  ? "text-red-600 dark:text-red-400"
-                  : (pendingApprovalCount ?? 0) > 5
-                    ? "text-yellow-600 dark:text-yellow-400"
-                    : "text-sky-700 dark:text-sky-300"
-              }`}
-            >
-              {pendingApprovalCount ?? 0}
+      <section className="flex flex-col mx-auto max-w-7xl px-4 py-8 gap-8">
+        <header className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
+              Brasil em tempo real
+            </p>
+            <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-50">
+              Dashboard
+            </h1>
+          </div>
+        </header>
+        {canSeePendingApproval ? (
+          <div className="mx-auto max-w-6xl px-4 pb-0 w-full">
+            <div className="flex items-center justify-between rounded-2xl border border-sky-200 bg-sky-50 px-5 py-4 shadow-sm dark:border-sky-900 dark:bg-sky-950/40">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700 dark:text-sky-300">
+                  Aprovação
+                </p>
+                <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                  Chamados aguardando análise
+                </p>
+              </div>
+              <div className="text-3xl font-bold text-sky-700 dark:text-sky-300">
+                {pendingApprovalCount ?? 0}
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+
+        <BrazilWeatherMap />
+      </section>
     </main>
   );
 }

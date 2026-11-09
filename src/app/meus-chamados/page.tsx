@@ -72,21 +72,31 @@ export default function MyTicketsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-8 dark:bg-slate-950">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
+    <main className="min-h-screen bg-slate-100 dark:bg-slate-950">
+      <section className="flex flex-col mx-auto max-w-7xl px-4 py-8 gap-8">
+        <header className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
+              MINHA ÁREA
+            </p>
+            <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-50">
+              Meus Chamados
+            </h1>
+          </div>
+        </header>
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          {/* <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
             Minha área
-          </p>
-          <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
+          </p> */}
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            {/* <div>
               <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">
                 Meus chamados
               </h1>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
                 Usuário: {userName}
               </p>
-            </div>
+            </div> */}
 
             <button
               type="button"
@@ -96,7 +106,7 @@ export default function MyTicketsPage() {
               Abrir chamado
             </button>
           </div>
-        </header>
+        </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -127,7 +137,7 @@ export default function MyTicketsPage() {
             emptyDescription="Ainda não há chamados neste filtro. Clique em “Abrir chamado” para começar."
           />
         </section>
-      </div>
+      </section>
 
       {isModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
