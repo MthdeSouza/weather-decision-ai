@@ -127,7 +127,7 @@ function projectPoint(lat: number, lon: number) {
 
 export function BrazilWeatherMap() {
   const [statesWeather, setStatesWeather] = useState<WeatherState[]>([]);
-  const [selectedUf, setSelectedUf] = useState<string>("SP");
+  const [selectedUfState, setSelectedUf] = useState<string>("SP");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -220,19 +220,13 @@ export function BrazilWeatherMap() {
     [statesWeather],
   );
 
+  const selectedUf = statesWeather.some(
+    (state) => state.uf === selectedUfState,
+  )
+    ? selectedUfState
+    : (statesWeather[0]?.uf ?? selectedUfState);
   const selectedState =
-    statesWeather.find((state) => state.uf === selectedUf) ??
-    statesWeather[0] ??
-    null;
-
-  useEffect(() => {
-    if (
-      statesWeather.length > 0 &&
-      !statesWeather.some((state) => state.uf === selectedUf)
-    ) {
-      setSelectedUf(statesWeather[0].uf);
-    }
-  }, [selectedUf, statesWeather]);
+    statesWeather.find((state) => state.uf === selectedUf) ?? null;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">

@@ -99,6 +99,7 @@ export interface Ticket {
   iaAnalysis: string | null;
   aiAnalysisMeta: TicketAiAnalysisMeta | null;
   climateContext: TicketClimateContext | null;
+  processingStartedAt?: Timestamp | Date | null;
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
 }

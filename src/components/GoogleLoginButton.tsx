@@ -6,14 +6,18 @@ import { loginWithGoogle } from "@/services/firebase/auth";
 
 type GoogleLoginButtonProps = {
   callbackUrl?: string;
+  onError?: (message: string) => void;
 };
 
 export function GoogleLoginButton({
   callbackUrl = "/",
+  onError,
 }: GoogleLoginButtonProps) {
   const router = useRouter();
   const safeCallbackUrl =
-    callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : "/";
+    callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
+      ? callbackUrl
+      : "/";
 
   const handleLogin = async () => {
     try {
@@ -21,6 +25,11 @@ export function GoogleLoginButton({
       router.push(safeCallbackUrl);
     } catch (error) {
       console.error("Erro ao entrar com Google:", error);
+      onError?.(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível iniciar a sessão.",
+      );
     }
   };
 

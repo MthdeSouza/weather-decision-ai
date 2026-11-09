@@ -7,8 +7,9 @@ import { TicketForm } from "@/components/TicketForm";
 import { TicketList } from "@/components/TicketList";
 import { TICKET_STATUS_LABELS } from "@/constants/tickets";
 import { auth } from "@/services/firebase/config";
-import { getCurrentAuthUser, getMyTickets } from "@/services/tickets";
+import { getMyTickets } from "@/services/tickets";
 import type { Ticket, TicketStatus } from "@/types/ticket";
+import { getConstructionLabel, getPropertyLabel } from "@/utils/helpers";
 
 const safeParseReport = (ticket: Ticket | null) => {
   if (!ticket) {
@@ -36,8 +37,7 @@ const safeParseReport = (ticket: Ticket | null) => {
 export default function MyTicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [statusFilter, setStatusFilter] = useState<"all" | TicketStatus>("all");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userName, setUserName] = useState("");
+  // const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -52,16 +52,13 @@ export default function MyTicketsPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
-        setIsAuthenticated(false);
-        setUserName("");
+        // setIsAuthenticated(false);
         setTickets([]);
         setLoading(false);
         return;
       }
 
-      setIsAuthenticated(true);
-      const user = await getCurrentAuthUser();
-      setUserName(user?.name ?? currentUser.displayName ?? "Usuário");
+      // setIsAuthenticated(true);
       await loadTickets();
     });
 
@@ -75,20 +72,6 @@ export default function MyTicketsPage() {
 
     return tickets.filter((ticket) => ticket.status === statusFilter);
   }, [statusFilter, tickets]);
-
-  useEffect(() => {
-    if (filteredTickets.length === 0) {
-      setSelectedTicketId(null);
-      return;
-    }
-
-    if (
-      !selectedTicketId ||
-      !filteredTickets.some((item) => item.id === selectedTicketId)
-    ) {
-      setSelectedTicketId(filteredTickets[0].id);
-    }
-  }, [filteredTickets, selectedTicketId]);
 
   const selectedTicket = useMemo(
     () =>
@@ -194,24 +177,24 @@ export default function MyTicketsPage() {
       ).sort((a, b) => Number(a.score ?? 0) - Number(b.score ?? 0))[0]
     : null;
 
-  if (!isAuthenticated) {
-    return (
-      <main className="min-h-screen bg-slate-100 px-6 py-10 dark:bg-slate-950">
-        <div className="mx-auto max-w-xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
-            Acesso obrigatório
-          </p>
-          <h1 className="mt-4 text-3xl font-bold text-slate-900 dark:text-slate-50">
-            Faça login para continuar
-          </h1>
-          <p className="mt-3 text-slate-600 dark:text-slate-300">
-            Só é possível visualizar e abrir chamados quando o usuário está
-            autenticado.
-          </p>
-        </div>
-      </main>
-    );
-  }
+  // if (!isAuthenticated) {
+  //   return (
+  //     <main className="min-h-screen bg-slate-100 px-6 py-10 dark:bg-slate-950">
+  //       <div className="mx-auto max-w-xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
+  //         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
+  //           Acesso obrigatório
+  //         </p>
+  //         <h1 className="mt-4 text-3xl font-bold text-slate-900 dark:text-slate-50">
+  //           Faça login para continuar
+  //         </h1>
+  //         <p className="mt-3 text-slate-600 dark:text-slate-300">
+  //           Só é possível visualizar e abrir chamados quando o usuário está
+  //           autenticado.
+  //         </p>
+  //       </div>
+  //     </main>
+  //   );
+  // }
 
   return (
     <main className="min-h-screen bg-slate-100 dark:bg-slate-950">
@@ -298,7 +281,7 @@ export default function MyTicketsPage() {
                       </h3>
                     </div>
                     <span className="rounded-full bg-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                      {selectedTicket.status}
+                      {TICKET_STATUS_LABELS[selectedTicket.status]}
                     </span>
                   </div>
 
@@ -308,7 +291,9 @@ export default function MyTicketsPage() {
                         Imóvel
                       </p>
                       <p className="mt-2 font-medium text-slate-900 dark:text-slate-50">
-                        {selectedTicket.construction.propertyType}
+                        {getPropertyLabel(
+                          selectedTicket.construction.propertyType,
+                        )}
                       </p>
                     </div>
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
@@ -316,7 +301,9 @@ export default function MyTicketsPage() {
                         Construção
                       </p>
                       <p className="mt-2 font-medium text-slate-900 dark:text-slate-50">
-                        {selectedTicket.construction.constructionType}
+                        {getConstructionLabel(
+                          selectedTicket.construction.constructionType,
+                        )}
                       </p>
                     </div>
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
@@ -324,7 +311,11 @@ export default function MyTicketsPage() {
                         Início da obra
                       </p>
                       <p className="mt-2 font-medium text-slate-900 dark:text-slate-50">
-                        {selectedTicket.construction.startDate || "-"}
+                        {selectedTicket.construction.startDate
+                          ? new Date(
+                              `${selectedTicket.construction.startDate}T00:00:00`,
+                            ).toLocaleDateString("pt-BR")
+                          : "-"}
                       </p>
                     </div>
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
@@ -468,9 +459,11 @@ export default function MyTicketsPage() {
                                 Tipo do imóvel
                               </dt>
                               <dd className="mt-1 font-medium">
-                                {String(
-                                  originalPlan.propertyType ??
-                                    selectedTicket.construction.propertyType,
+                                {getPropertyLabel(
+                                  String(
+                                    originalPlan.propertyType ??
+                                      selectedTicket.construction.propertyType,
+                                  ),
                                 )}
                               </dd>
                             </div>
@@ -479,10 +472,12 @@ export default function MyTicketsPage() {
                                 Tipo de construção
                               </dt>
                               <dd className="mt-1 font-medium">
-                                {String(
-                                  originalPlan.constructionType ??
-                                    selectedTicket.construction
-                                      .constructionType,
+                                {getConstructionLabel(
+                                  String(
+                                    originalPlan.constructionType ??
+                                      selectedTicket.construction
+                                        .constructionType,
+                                  ),
                                 )}
                               </dd>
                             </div>

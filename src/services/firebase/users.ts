@@ -44,7 +44,9 @@ export const getOrCreateUser = async (user: {
     email: user.email ?? "",
     photoURL: user.photoURL ?? "",
     provider: user.provider ?? "firebase",
-    role: "basic",
+    role: userSnapshot.exists()
+      ? (userSnapshot.data().role ?? "basic")
+      : "basic",
     createdAt: userSnapshot.exists()
       ? (userSnapshot.data().createdAt ?? serverTimestamp())
       : serverTimestamp(),

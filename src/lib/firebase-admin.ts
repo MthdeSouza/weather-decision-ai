@@ -1,6 +1,13 @@
-import { cert, getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import "server-only";
+
+import {
+  applicationDefault,
+  cert,
+  getApps,
+  initializeApp,
+} from "firebase-admin/app";
+import { getAuth, type Auth } from "firebase-admin/auth";
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
 const projectId =
   process.env.FIREBASE_PROJECT_ID ??
@@ -20,7 +27,10 @@ const serviceAccount =
     : null;
 
 export const isFirebaseAdminConfigured = Boolean(
-  projectId && (serviceAccount || process.env.GOOGLE_APPLICATION_CREDENTIALS),
+  projectId &&
+    (serviceAccount ||
+      process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+      process.env.K_SERVICE),
 );
 
 const adminApp = getApps().length
@@ -34,7 +44,7 @@ const adminApp = getApps().length
             }
           : {
               projectId,
-              credential: undefined,
+              credential: applicationDefault(),
             },
       )
     : null;
@@ -48,9 +58,9 @@ const makeMissingFirebaseAdminProxy = <T extends object>(label: string) =>
     },
   });
 
-export const adminDb = (
-  adminApp ? getFirestore(adminApp) : makeMissingFirebaseAdminProxy("Firestore")
-) as any;
-export const adminAuth = (
-  adminApp ? getAuth(adminApp) : makeMissingFirebaseAdminProxy("Auth")
-) as any;
+export const adminDb: Firestore = adminApp
+  ? getFirestore(adminApp)
+  : (makeMissingFirebaseAdminProxy<Firestore>("Firestore") as Firestore);
+export const adminAuth: Auth = adminApp
+  ? getAuth(adminApp)
+  : (makeMissingFirebaseAdminProxy<Auth>("Auth") as Auth);

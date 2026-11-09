@@ -1,3 +1,5 @@
+import { BRAZIL_STATES } from "@/data/brazilStates";
+
 const WEATHER_LABELS: Record<number, string> = {
   0: "Céu limpo",
   1: "Parcialmente nublado",
@@ -31,6 +33,27 @@ const WEATHER_LABELS: Record<number, string> = {
 
 const locationCache = new Map<string, Promise<OpenMeteoLocation>>();
 const climateCache = new Map<string, Promise<HistoricalClimateContext>>();
+const MAX_CACHE_ENTRIES = 200;
+
+function cacheRequest<T>(
+  cache: Map<string, Promise<T>>,
+  key: string,
+  request: Promise<T>,
+) {
+  cache.set(key, request);
+  if (cache.size > MAX_CACHE_ENTRIES) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey && oldestKey !== key) {
+      cache.delete(oldestKey);
+    }
+  }
+  void request.catch(() => {
+    if (cache.get(key) === request) {
+      cache.delete(key);
+    }
+  });
+  return request;
+}
 
 const normalizeString = (value: string) =>
   value
@@ -50,17 +73,12 @@ const getPercentValue = (value: unknown, fallback = 0) => {
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, {
     headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(10_000),
     next: { revalidate: 3600 },
   });
 
   if (!response.ok) {
-    const curl = `curl -X GET '${url}' -H 'Accept: application/json'`;
-
-    console.log("[Open-Meteo] Erro Executing request:");
-    console.log(curl);
-    throw new Error(
-      `Open-Meteo request failed (${response.status}) for ${url}`,
-    );
+    throw new Error(`Open-Meteo request failed (${response.status}).`);
   }
 
   return (await response.json()) as T;
@@ -101,7 +119,11 @@ export async function geocodeLocation(
   country = "Brazil",
 ): Promise<OpenMeteoLocation> {
   const normalizedCity = normalizeString(city);
-  const normalizedState = state ? normalizeString(state) : "";
+  const stateName =
+    BRAZIL_STATES.find(
+      (item) => normalizeString(item.uf) === normalizeString(state ?? ""),
+    )?.name ?? state ?? "";
+  const normalizedState = stateName ? normalizeString(stateName) : "";
   const cacheKey = `${normalizedCity}|${normalizedState}|${normalizeString(country)}`;
 
   const cached = locationCache.get(cacheKey);
@@ -132,20 +154,42 @@ export async function geocodeLocation(
 
     const results = payload.results ?? [];
 
-    const matches = results.filter((result) => {
-      const matchesCountry =
+    const countryMatches = results.filter((result) => {
+      const localizedCountry = normalizeString(result.country ?? "");
+      return (
         !country ||
-        normalizeString(result.country ?? "") === normalizeString(country);
-      const matchesState =
+        localizedCountry === normalizeString(country) ||
+        (normalizeString(country) === "brazil" &&
+          localizedCountry === "brasil")
+      );
+    });
+    const matches = countryMatches.filter((result) => {
+      const resultState = normalizeString(result.admin1 ?? "");
+      return (
         !normalizedState ||
-        normalizeString(result.admin1 ?? "") === normalizedState ||
-        normalizeString(result.admin1 ?? "").includes(normalizedState) ||
-        normalizeString(result.name ?? "").includes(normalizedState);
-
-      return matchesCountry && matchesState;
+        resultState === normalizedState ||
+        resultState.includes(normalizedState)
+      );
     });
 
-    const selected = matches[0] ?? results[0];
+    if (normalizedState && matches.length === 0) {
+      throw new Error(
+        `Cidade não encontrada no estado informado: ${city}, ${stateName}.`,
+      );
+    }
+
+    const exactNameMatches = matches.filter(
+      (result) => normalizeString(result.name ?? "") === normalizedCity,
+    );
+    const candidates = exactNameMatches.length ? exactNameMatches : matches;
+
+    if (candidates.length > 1) {
+      throw new Error(
+        `Cidade ambígua. Informe um estado válido para identificar a localização correta: ${city}.`,
+      );
+    }
+
+    const selected = candidates[0];
 
     if (
       !selected ||
@@ -165,23 +209,10 @@ export async function geocodeLocation(
       longitude: selected.longitude,
     };
 
-    if (!state && results.length > 1) {
-      const exactMatches = results.filter(
-        (item) => normalizeString(item.name ?? "") === normalizeString(city),
-      );
-
-      if (exactMatches.length > 1) {
-        throw new Error(
-          `Cidade ambígua. Informe o estado para identificar a localização correta: ${city}`,
-        );
-      }
-    }
-
     return location;
   })();
 
-  locationCache.set(cacheKey, request);
-  return request;
+  return cacheRequest(locationCache, cacheKey, request);
 }
 
 export async function getHistoricalClimateContext(input: {
@@ -190,16 +221,24 @@ export async function getHistoricalClimateContext(input: {
   startDate?: string;
 }): Promise<HistoricalClimateContext> {
   const normalizedStart = input.startDate ?? toIsoDate(new Date());
-  const startDate = new Date(`${normalizedStart}T00:00:00`);
-  const today = new Date();
-  const safeEndDate = new Date(startDate);
-
-  if (safeEndDate > today) {
-    safeEndDate.setTime(today.getTime());
+  const startDate = new Date(`${normalizedStart}T00:00:00Z`);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(normalizedStart) ||
+    Number.isNaN(startDate.getTime()) ||
+    toIsoDate(startDate) !== normalizedStart
+  ) {
+    throw new Error("Data inicial inválida para consulta histórica.");
   }
 
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const latestAvailableDate = new Date(today);
+  latestAvailableDate.setUTCDate(latestAvailableDate.getUTCDate() - 5);
+  const safeEndDate =
+    startDate < latestAvailableDate ? new Date(startDate) : latestAvailableDate;
+
   const historicalStart = new Date(safeEndDate);
-  historicalStart.setFullYear(historicalStart.getFullYear() - 3);
+  historicalStart.setUTCFullYear(historicalStart.getUTCFullYear() - 3);
 
   const cacheKey = `${normalizeString(input.city)}|${normalizeString(input.state ?? "")}|${toIsoDate(startDate)}`;
   const cached = climateCache.get(cacheKey);
@@ -317,6 +356,5 @@ export async function getHistoricalClimateContext(input: {
     return context;
   })();
 
-  climateCache.set(cacheKey, request);
-  return request;
+  return cacheRequest(climateCache, cacheKey, request);
 }

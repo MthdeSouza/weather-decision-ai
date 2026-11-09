@@ -5,9 +5,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { loginWithGoogle, logout } from "@/services/firebase/auth";
+import {
+  loginWithGoogle,
+  logout,
+  syncLoggedUser,
+} from "@/services/firebase/auth";
 import { auth } from "@/services/firebase/config";
-import { getUserProfileByUid } from "@/services/firebase/users";
 import type { UserRole } from "@/types/user";
 
 const navItems: Array<{
@@ -28,7 +31,7 @@ const navItems: Array<{
     label: "Gerenciamento de chamados",
     href: "/gerenciamento",
     protected: true,
-    allowedRoles: ["approver", "admin"],
+    allowedRoles: ["admin"],
   },
   { label: "Futuro", href: "/future", protected: true },
   { label: "AIChat", href: "/ai-chat", protected: true },
@@ -49,8 +52,15 @@ export function Sidebar() {
         return;
       }
 
-      const profile = await getUserProfileByUid(nextUser.uid);
-      setRole((profile?.role ?? "basic") as UserRole);
+      try {
+        const { profile } = await syncLoggedUser(nextUser);
+        setRole((profile.role ?? "basic") as UserRole);
+      } catch (error) {
+        console.error("[auth] failed to restore server session", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        setRole("basic");
+      }
     });
 
     return () => unsubscribe();

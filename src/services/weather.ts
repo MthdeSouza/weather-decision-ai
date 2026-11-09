@@ -54,8 +54,6 @@ export async function getWeatherSummary(city: string): Promise<WeatherContext> {
     `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(normalizedCity)}&count=1&language=pt&format=json`,
   );
 
-  console.log("geoResponse", geoResponse);
-
   const location = geoResponse.results?.[0];
 
   if (!location) {
@@ -75,8 +73,6 @@ export async function getWeatherSummary(city: string): Promise<WeatherContext> {
 
   const current = weatherResponse.current ?? {};
   const weatherCode = Number(current.weather_code ?? 0);
-
-  console.log("weatherResponse", weatherResponse);
 
   return {
     city: location.name,

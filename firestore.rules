@@ -6,69 +6,161 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function userProfileExists(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function userRole(uid) {
+      return userProfileExists(uid)
+        ? get(/databases/$(database)/documents/users/$(uid)).data.role
+        : 'basic';
+    }
+
     function isAdmin() {
-      return isAuthenticated() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return isAuthenticated() && userRole(request.auth.uid) == 'admin';
     }
 
     function isApproverOrAdmin() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'approver' ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      return isAuthenticated()
+        && userRole(request.auth.uid) in ['approver', 'admin'];
     }
 
-    function userProfile(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data;
+    function hasValidUserProfile(profile) {
+      return profile.name is string
+        && profile.name.size() <= 200
+        && profile.email is string
+        && profile.email.size() <= 320
+        && profile.photoURL is string
+        && profile.photoURL.size() <= 2048
+        && profile.provider in ['google.com', 'firebase'];
+    }
+
+    function canReadTicket(ticket) {
+      return isAuthenticated()
+        && (ticket.createdBy.uid == request.auth.uid || isApproverOrAdmin());
     }
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (
-        request.auth.uid == userId || isAdmin()
-      );
+      allow get: if isAuthenticated()
+        && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
 
       allow create: if isAuthenticated()
         && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly([
+          'uid', 'name', 'email', 'photoURL', 'provider', 'role',
+          'createdAt', 'updatedAt', 'lastLoginAt'
+        ])
         && request.resource.data.uid == userId
-        && request.resource.data.role == 'basic';
+        && request.resource.data.role == 'basic'
+        && hasValidUserProfile(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastLoginAt == request.time;
 
-      allow update: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated()
+        && request.auth.uid == userId
+        && request.resource.data.uid == resource.data.uid
+        && hasValidUserProfile(request.resource.data)
+        && (
+          ('role' in resource.data
+            && request.resource.data.role == resource.data.role)
+          || (!('role' in resource.data)
+            && request.resource.data.role == 'basic')
+        )
+        && (
+          ('createdAt' in resource.data
+            && request.resource.data.createdAt == resource.data.createdAt)
+          || (!('createdAt' in resource.data)
+            && request.resource.data.createdAt == request.time)
+        )
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'email', 'photoURL', 'provider', 'role', 'createdAt',
+          'updatedAt', 'lastLoginAt'
+        ])
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastLoginAt == request.time
+      );
+
       allow delete: if isAdmin();
     }
 
     match /tickets/{ticketId} {
-      function isOwner() {
-        return isAuthenticated() && resource.data.createdBy.uid == request.auth.uid;
-      }
-
-      allow get: if isAuthenticated();
-      allow list: if isAuthenticated();
+      allow get, list: if canReadTicket(resource.data);
 
       allow create: if isAuthenticated()
+        && request.resource.data.keys().hasOnly([
+          'id', 'createdBy', 'construction', 'status', 'approval',
+          'iaAnalysis', 'aiAnalysisMeta', 'climateContext',
+          'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.id == ticketId
+        && request.resource.data.createdBy is map
+        && request.resource.data.createdBy.keys().hasOnly([
+          'uid', 'name', 'email'
+        ])
         && request.resource.data.createdBy.uid == request.auth.uid
-        && request.resource.data.createdBy.email is string
         && request.resource.data.createdBy.name is string
+        && request.resource.data.createdBy.name.size() <= 200
+        && request.resource.data.createdBy.email is string
+        && request.resource.data.createdBy.email.size() <= 320
         && request.resource.data.construction is map
+        && request.resource.data.construction.keys().hasOnly([
+          'city', 'state', 'propertyType', 'constructionType', 'type',
+          'startDate', 'estimatedMonths', 'builtArea'
+        ])
         && request.resource.data.construction.city is string
+        && request.resource.data.construction.city.size() > 0
+        && request.resource.data.construction.city.size() <= 100
         && request.resource.data.construction.state is string
-        && request.resource.data.status in ['pending_approval', 'pending_ai_analysis'];
-
-      allow update: if isAuthenticated() && (
-        (
-          isOwner() &&
-          request.resource.data.createdBy.uid == resource.data.createdBy.uid
-        ) ||
-        (
-          isApproverOrAdmin() &&
-          request.resource.data.createdBy.uid == resource.data.createdBy.uid &&
-          (
-            (resource.data.status == 'pending_approval' && request.resource.data.status in ['pending_approval', 'pending_ai_analysis', 'rejected']) ||
-            (resource.data.status == 'pending_ai_analysis' && request.resource.data.status == 'pending_ai_analysis') ||
-            (resource.data.status == 'rejected' && request.resource.data.status == 'rejected')
-          )
+        && request.resource.data.construction.state.size() > 0
+        && request.resource.data.construction.state.size() <= 100
+        && request.resource.data.construction.propertyType is string
+        && request.resource.data.construction.propertyType in [
+          'residential', 'commercial', 'industrial', 'warehouse',
+          'infrastructure', 'other'
+        ]
+        && request.resource.data.construction.constructionType is string
+        && request.resource.data.construction.constructionType in [
+          'masonry', 'steel_frame', 'wood_frame', 'concrete', 'mixed', 'other'
+        ]
+        && request.resource.data.construction.startDate is string
+        && request.resource.data.construction.startDate.matches(
+          '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
         )
-      );
+        && request.resource.data.construction.estimatedMonths is int
+        && request.resource.data.construction.estimatedMonths > 0
+        && request.resource.data.construction.builtArea is number
+        && request.resource.data.construction.builtArea > 0
+        && request.resource.data.approval is map
+        && request.resource.data.approval.keys().hasOnly([
+          'approvedBy', 'approvedAt', 'rejectedBy', 'rejectedAt',
+          'rejectionReason'
+        ])
+        && request.resource.data.approval.approvedBy == null
+        && request.resource.data.approval.approvedAt == null
+        && request.resource.data.approval.rejectedBy == null
+        && request.resource.data.approval.rejectedAt == null
+        && request.resource.data.approval.rejectionReason == null
+        && request.resource.data.iaAnalysis == null
+        && request.resource.data.aiAnalysisMeta == null
+        && request.resource.data.climateContext == null
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && (
+          (userRole(request.auth.uid) == 'basic'
+            && request.resource.data.status == 'pending_approval')
+          || (userRole(request.auth.uid) in ['approver', 'admin']
+            && request.resource.data.status == 'pending_ai_analysis')
+        );
 
-      allow delete: if isAdmin();
+      // Ticket changes are made by authenticated Next.js Route Handlers using Admin SDK.
+      allow update, delete: if false;
+    }
+
+    match /apiRateLimits/{rateLimitId} {
+      allow read, write: if false;
     }
   }
 }

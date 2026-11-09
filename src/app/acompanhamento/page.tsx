@@ -4,6 +4,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useEffect, useMemo, useState } from "react";
 
 import { TicketStatusBadge } from "@/components/TicketStatusBadge";
+import { isProcessingRunStale } from "@/lib/ticket-workflow";
 import { auth } from "@/services/firebase/config";
 import {
   filterAndSortTickets,
@@ -39,6 +40,11 @@ const RESTARTABLE_ANALYSIS_STATUSES = new Set([
   "pending_ai_analysis",
   "completed",
 ]);
+
+const canRestartAnalysis = (ticket: Ticket) =>
+  RESTARTABLE_ANALYSIS_STATUSES.has(ticket.status) ||
+  (ticket.status === "processing" &&
+    isProcessingRunStale(ticket.processingStartedAt));
 
 export default function TicketTrackingPage() {
   const [role, setRole] = useState<UserRole>("basic");
@@ -85,11 +91,10 @@ export default function TicketTrackingPage() {
       const currentRole = (profile?.role ?? "basic") as UserRole;
       setRole(currentRole);
 
-      const isPrivileged =
-        currentRole === "approver" || currentRole === "admin";
-      setIsAuthorized(isPrivileged);
+      const isAdmin = currentRole === "admin";
+      setIsAuthorized(isAdmin);
 
-      if (isPrivileged) {
+      if (isAdmin) {
         await loadTickets();
       }
     });
@@ -126,7 +131,7 @@ export default function TicketTrackingPage() {
       setProcessingTicketIds((previous) => [...previous, ticketId]);
       setIsConfirmingAction(true);
 
-      const response = await fetch(`/api/tickets/${ticketId}/analyze`, {
+      const response = await fetch(`/api/tickets/${ticketId}/process`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -223,7 +228,7 @@ export default function TicketTrackingPage() {
             Gerenciamento de chamados
           </h1>
           <p className="mt-3 text-slate-600 dark:text-slate-300">
-            Apenas approver e admin podem acompanhar e reprocessar todos os
+            Somente usuários admin podem gerenciar e reprocessar todos os
             tickets.
           </p>
         </div>
@@ -234,17 +239,15 @@ export default function TicketTrackingPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8 dark:bg-slate-950">
       <div className="mx-auto max-w-7xl space-y-6">
-        <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
-            Operação
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-50">
-            Gerenciamento de chamados
-          </h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Perfil atual:{" "}
-            <span className="font-semibold capitalize">{role}</span>
-          </p>
+        <header className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
+              Operação
+            </p>
+            <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-50">
+              Gerenciamento de chamados
+            </h1>
+          </div>
         </header>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -402,9 +405,7 @@ export default function TicketTrackingPage() {
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-2">
-                            {RESTARTABLE_ANALYSIS_STATUSES.has(
-                              ticket.status,
-                            ) ? (
+                            {canRestartAnalysis(ticket) ? (
                               <button
                                 type="button"
                                 onClick={() =>

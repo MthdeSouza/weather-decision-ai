@@ -1,120 +1,72 @@
 import { NextResponse } from "next/server";
 
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { getHistoricalClimateContext } from "@/lib/open-meteo";
+import {
+  apiErrorResponse,
+  ApiRequestError,
+  consumeApiRateLimit,
+  requireFirebaseActor,
+} from "@/lib/api-auth";
+import { adminDb } from "@/lib/firebase-admin";
+import { canApproveTicket } from "@/lib/ticket-workflow";
 import { processApprovedTicket } from "@/lib/ticket-processing";
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get("authorization");
-    const token = authHeader?.startsWith("Bearer ")
-      ? authHeader.replace("Bearer ", "")
-      : null;
+    const actor = await requireFirebaseActor(request, ["approver", "admin"]);
+    await consumeApiRateLimit(actor.uid, "ticket-approval", 10, 60 * 60 * 1000);
 
-    if (!token) {
-      return NextResponse.json({ error: "Token ausente." }, { status: 401 });
-    }
+    const body = await request.json().catch(() => null);
+    const ticketId =
+      typeof body?.ticketId === "string" ? body.ticketId.trim() : "";
 
-    const decodedToken = await adminAuth.verifyIdToken(token);
-    const userSnapshot = await adminDb
-      .collection("users")
-      .doc(decodedToken.uid)
-      .get();
-    const userRole = userSnapshot.data()?.role ?? "basic";
-
-    if (userRole !== "admin" && userRole !== "approver") {
-      return NextResponse.json(
-        { error: "Usuário sem permissão para aprovar chamados." },
-        { status: 403 },
-      );
-    }
-
-    const body = await request.json();
-    const ticketId = typeof body?.ticketId === "string" ? body.ticketId : "";
-
-    if (!ticketId.trim()) {
-      return NextResponse.json(
-        { error: "ticketId obrigatório." },
-        { status: 400 },
-      );
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(ticketId)) {
+      throw new ApiRequestError("Identificador de chamado inválido.", 400);
     }
 
     const ticketRef = adminDb.collection("tickets").doc(ticketId);
-    const ticketSnapshot = await ticketRef.get();
+    await adminDb.runTransaction(async (transaction) => {
+      const ticketSnapshot = await transaction.get(ticketRef);
 
-    if (!ticketSnapshot.exists) {
-      return NextResponse.json(
-        { error: "Chamado não encontrado." },
-        { status: 404 },
-      );
-    }
+      if (!ticketSnapshot.exists) {
+        throw new ApiRequestError("Chamado não encontrado.", 404);
+      }
 
-    const ticket = ticketSnapshot.data();
-    if (!ticket) {
-      return NextResponse.json(
-        { error: "Dados do chamado inválidos." },
-        { status: 400 },
-      );
-    }
+      const ticket = ticketSnapshot.data() ?? {};
+      if (!canApproveTicket(ticket.status)) {
+        throw new ApiRequestError(
+          "O chamado não está aguardando aprovação.",
+          409,
+        );
+      }
 
-    const city =
-      typeof ticket.construction?.city === "string"
-        ? ticket.construction.city
-        : "";
-    const state =
-      typeof ticket.construction?.state === "string"
-        ? ticket.construction.state
-        : "";
-    const startDate =
-      typeof ticket.construction?.startDate === "string"
-        ? ticket.construction.startDate
-        : undefined;
-
-    const climateContext = await getHistoricalClimateContext({
-      city,
-      state,
-      startDate,
-    });
-
-    await ticketRef.update({
-      status: "pending_ai_analysis",
-      approval: {
-        approvedBy: {
-          uid: decodedToken.uid,
-          name: decodedToken.name ?? "Usuário",
-          email: decodedToken.email ?? "",
+      transaction.update(ticketRef, {
+        status: "pending_ai_analysis",
+        approval: {
+          approvedBy: {
+            uid: actor.uid,
+            name: actor.name,
+            email: actor.email,
+          },
+          approvedAt: new Date(),
+          rejectedBy: null,
+          rejectedAt: null,
+          rejectionReason: null,
         },
-        approvedAt: new Date(),
-        rejectedBy: null,
-        rejectedAt: null,
-        rejectionReason: null,
-      },
-      climateContext,
-      updatedAt: new Date(),
+        updatedAt: new Date(),
+      });
     });
 
-    const processingResult = await processApprovedTicket(ticketId, {
-      uid: decodedToken.uid,
-      name: decodedToken.name ?? "Usuário",
-      email: decodedToken.email ?? "",
-      role: userRole,
-    });
+    const processingResult = await processApprovedTicket(ticketId, actor);
 
     return NextResponse.json({
       ok: processingResult.ok,
       status: processingResult.status,
       ticketId,
-      climateContext,
       analysisId: processingResult.analysisId,
       report: processingResult.report,
       error: processingResult.error,
-    });
+    }, { status: processingResult.ok ? 200 : 502 });
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Não foi possível aprovar o chamado.";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiErrorResponse(error, "ticket-approval");
   }
 }

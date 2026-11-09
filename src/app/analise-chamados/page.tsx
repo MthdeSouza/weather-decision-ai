@@ -13,7 +13,6 @@ import { auth } from "@/services/firebase/config";
 import {
   getCurrentAuthUser,
   getPendingApprovalTickets,
-  rejectTicket,
 } from "@/services/tickets";
 import type { Ticket } from "@/types/ticket";
 
@@ -90,11 +89,6 @@ export default function AnalysisPage() {
       return;
     }
 
-    const reviewer = await getCurrentAuthUser();
-    if (!reviewer) {
-      return;
-    }
-
     const currentToken = await auth.currentUser?.getIdToken();
     if (!currentToken) {
       window.alert("Sessão do usuário indisponível para aprovar o chamado.");
@@ -107,14 +101,7 @@ export default function AnalysisPage() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${currentToken}`,
       },
-      body: JSON.stringify({
-        ticketId,
-        reviewer: {
-          uid: reviewer.uid,
-          name: reviewer.name,
-          email: reviewer.email,
-        },
-      }),
+      body: JSON.stringify({ ticketId }),
     });
 
     const payload = (await response.json()) as { error?: string };
@@ -134,20 +121,36 @@ export default function AnalysisPage() {
       return;
     }
 
-    const reviewer = await getCurrentAuthUser();
-    if (!reviewer) {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) {
+      window.alert("Sessão do usuário indisponível para reprovar o chamado.");
       return;
     }
 
-    await rejectTicket(
-      ticketId,
-      {
-        uid: reviewer.uid,
-        name: reviewer.name,
-        email: reviewer.email,
-      },
-      reason.trim(),
-    );
+    try {
+      const response = await fetch(`/api/tickets/${ticketId}/reject`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason: reason.trim() }),
+      });
+      const payload = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? "Não foi possível reprovar o chamado.",
+        );
+      }
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível reprovar o chamado.",
+      );
+      return;
+    }
 
     await loadTickets();
   };
@@ -174,7 +177,7 @@ export default function AnalysisPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8 dark:bg-slate-950">
       <div className="mx-auto max-w-7xl space-y-6">
-        <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        {/* <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
             Aprovação
           </p>
@@ -185,6 +188,16 @@ export default function AnalysisPage() {
             Perfil atual:{" "}
             <span className="font-semibold capitalize">{role}</span>
           </p>
+        </header> */}
+        <header className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
+              MINHA ÁREA
+            </p>
+            <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-50">
+              Meus Chamados
+            </h1>
+          </div>
         </header>
 
         {loading ? (

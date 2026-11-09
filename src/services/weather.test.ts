@@ -2,11 +2,28 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
 import { evaluateConstructionScenarios } from "../lib/climate-scenarios";
-import { getHistoricalClimateContext } from "../lib/open-meteo";
-import { createProcessingDiagnostics } from "../lib/ticket-processing";
+import { getDefaultCityForState } from "../data/brazilLocations";
+import {
+  geocodeLocation,
+  getHistoricalClimateContext,
+} from "../lib/open-meteo";
+import { createProcessingDiagnostics } from "../lib/processing-diagnostics";
+import {
+  canAccessRole,
+  canApproveTicket,
+  canBeginTicketProcessing,
+  canRejectTicket,
+  initialTicketStatus,
+  isProcessingRunStale,
+  isPrivilegedRole,
+  PROCESSING_LOCK_TIMEOUT_MS,
+} from "../lib/ticket-workflow";
 import type { Ticket } from "../types/ticket";
 
-import { analyzeDecision } from "./gemini";
+import {
+  analyzeDecision,
+  ConstructionAnalysisReportSchema,
+} from "./gemini";
 import { filterAndSortTickets } from "./ticket-filters";
 import { getWeatherSummary } from "./weather";
 
@@ -153,6 +170,39 @@ describe("getWeatherSummary", () => {
     assert.ok(context.source.includes("Open-Meteo"));
   });
 
+  it("maps a Brazilian state abbreviation and rejects a city outside that state", async () => {
+    global.fetch = async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes("geocoding-api.open-meteo.com")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                name: "São José",
+                admin1: "São Paulo",
+                country: "Brasil",
+                latitude: -23.2,
+                longitude: -46.1,
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const location = await geocodeLocation("São José", "SP");
+    assert.equal(location.state, "São Paulo");
+
+    await assert.rejects(
+      geocodeLocation("São José", "RJ"),
+      /Cidade não encontrada no estado informado/,
+    );
+  });
+
   it("evaluates the 12 possible start months and compares scenario risk deterministically", async () => {
     const climateContext = {
       location: {
@@ -254,7 +304,7 @@ describe("getWeatherSummary", () => {
         }
 
         if (url.includes("archive-api.open-meteo.com")) {
-          assert.match(url, /end_date=2026-11-08/);
+          assert.match(url, /end_date=2026-11-03/);
           assert.doesNotMatch(url, /end_date=2026-11-10/);
 
           return new Response(
@@ -284,7 +334,7 @@ describe("getWeatherSummary", () => {
         startDate: "2026-11-10",
       });
 
-      assert.equal(context.period.endDate, "2026-11-08");
+      assert.equal(context.period.endDate, "2026-11-03");
     } finally {
       global.Date = RealDate;
     }
@@ -391,6 +441,179 @@ describe("getWeatherSummary", () => {
     assert.equal(diagnostic.errorType, "gemini_api_error");
     assert.ok(!diagnostic.message.includes("AIzaKey123"));
     assert.ok(!diagnostic.message.includes("user@example.com"));
-    assert.ok(diagnostic.message.includes("[redacted]"));
+    assert.ok(!diagnostic.message.includes("[redacted]"));
+    assert.ok(!diagnostic.message.includes("Gemini failed"));
+  });
+
+  it("retries Open-Meteo after an upstream failure without caching the failure", async () => {
+    let archiveCalls = 0;
+    global.fetch = async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes("geocoding-api.open-meteo.com")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                name: "Retry Town",
+                admin1: "São Paulo",
+                country: "Brazil",
+                latitude: -23.5,
+                longitude: -46.6,
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      if (url.includes("archive-api.open-meteo.com")) {
+        archiveCalls += 1;
+        if (archiveCalls === 1) {
+          return new Response("bad request", { status: 400 });
+        }
+
+        return new Response(
+          JSON.stringify({
+            daily: {
+              time: ["2023-01-01"],
+              precipitation_sum: [0],
+              temperature_2m_mean: [20],
+              temperature_2m_max: [25],
+              temperature_2m_min: [15],
+              relative_humidity_2m_mean: [60],
+              wind_speed_10m_max: [10],
+              wind_gusts_10m_max: [15],
+              weather_code: [0],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    await assert.rejects(
+      getHistoricalClimateContext({
+        city: "Retry Town",
+        state: "São Paulo",
+        startDate: "2024-01-01",
+      }),
+      /Open-Meteo request failed \(400\)\./,
+    );
+
+    const result = await getHistoricalClimateContext({
+      city: "Retry Town",
+      state: "São Paulo",
+      startDate: "2024-01-01",
+    });
+
+    assert.equal(result.location.name, "Retry Town");
+    assert.equal(archiveCalls, 2);
+  });
+
+  it("validates the structured Gemini report and rejects incomplete output", () => {
+    const report = {
+      executiveSummary: "Resumo fundamentado nos dados fornecidos.",
+      climateOverview: "Dados históricos; não são previsão.",
+      originalPlan: {
+        city: "São Paulo",
+        state: "SP",
+        propertyType: "residential",
+        constructionType: "masonry",
+        builtArea: 100,
+        startDate: "2027-01-01",
+        estimatedMonths: 6,
+        durationByPhase: [{ phase: "Estrutura", months: 3 }],
+      },
+      stageAnalysis: [],
+      recommendations: [],
+      alternativeStartDates: [],
+      constructionAlternatives: [],
+      riskAssessment: {
+        overallRiskLevel: "medium",
+        keyRisks: [],
+        potentialDelays: [],
+      },
+      limitations: [],
+      dataSources: ["Open-Meteo"],
+    };
+
+    assert.equal(
+      ConstructionAnalysisReportSchema.safeParse(report).success,
+      true,
+    );
+    assert.equal(
+      ConstructionAnalysisReportSchema.safeParse({
+        executiveSummary: "Relatório incompleto",
+      }).success,
+      false,
+    );
+  });
+
+  it("enforces ticket creation, approval, processing, and role transitions", () => {
+    assert.equal(initialTicketStatus("basic"), "pending_approval");
+    assert.equal(initialTicketStatus("approver"), "pending_ai_analysis");
+    assert.equal(initialTicketStatus("admin"), "pending_ai_analysis");
+    assert.equal(isPrivilegedRole("approver"), true);
+    assert.equal(isPrivilegedRole("basic"), false);
+    assert.equal(canApproveTicket("pending_approval"), true);
+    assert.equal(canApproveTicket("completed"), false);
+    assert.equal(canRejectTicket("pending_approval"), true);
+    assert.equal(canRejectTicket("processing"), false);
+    assert.equal(canBeginTicketProcessing("pending_ai_analysis"), true);
+    assert.equal(canBeginTicketProcessing("failed"), true);
+    assert.equal(canBeginTicketProcessing("completed"), true);
+    assert.equal(canBeginTicketProcessing("pending_approval"), false);
+    assert.equal(canBeginTicketProcessing("processing"), false);
+    assert.equal(canBeginTicketProcessing("archived"), false);
+  });
+
+  it("only allows recovering a processing run after its lease expires", () => {
+    const now = 1_000_000;
+
+    assert.equal(isProcessingRunStale(now - 1_000, now), false);
+    assert.equal(
+      isProcessingRunStale(
+        { seconds: (now - 1_000) / 1000, nanoseconds: 0 },
+        now,
+      ),
+      false,
+    );
+    assert.equal(
+      isProcessingRunStale(now - PROCESSING_LOCK_TIMEOUT_MS, now),
+      true,
+    );
+    assert.equal(isProcessingRunStale(null, now), true);
+  });
+
+  it("enforces the requested page roles", () => {
+    assert.equal(canAccessRole("basic", ["basic", "approver", "admin"]), true);
+    assert.equal(canAccessRole("approver", ["approver", "admin"]), true);
+    assert.equal(canAccessRole("admin", ["approver", "admin"]), true);
+    assert.equal(canAccessRole("basic", ["approver", "admin"]), false);
+    assert.equal(canAccessRole("approver", ["admin"]), false);
+    assert.equal(canAccessRole("admin", ["admin"]), true);
+    assert.equal(canAccessRole("unknown", ["basic", "admin"]), false);
+
+    for (const role of ["basic", "approver", "admin"] as const) {
+      assert.equal(canAccessRole(role, ["basic", "approver", "admin"]), true);
+    }
+    assert.equal(canAccessRole("basic", ["basic"]), true);
+    assert.equal(canAccessRole("approver", ["approver", "admin"]), true);
+    assert.equal(canAccessRole("admin", ["admin"]), true);
+  });
+
+  it("defaults the ticket city to the selected state's capital", () => {
+    assert.equal(
+      getDefaultCityForState("SP", ["Campinas", "São Paulo", "Santos"]),
+      "São Paulo",
+    );
+    assert.equal(
+      getDefaultCityForState("RJ", ["Niterói", "Rio de Janeiro"]),
+      "Rio de Janeiro",
+    );
+    assert.equal(getDefaultCityForState("SP", []), "");
   });
 });

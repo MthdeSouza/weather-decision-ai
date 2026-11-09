@@ -1,40 +1,62 @@
-# weather-decision-ai
-An AI-powered app that analyzes weather data and historical climate patterns to recommend the best time of year for construction projects in any city, helping reduce weather-related risks, delays, and costs.
+# Weather Decision AI
 
-## Getting Started
+An AI-powered app that analyzes historical weather patterns to help construction
+teams assess climate risks and plan project start dates.
 
-First, run the development server:
+## Getting started
+
+Use Node.js 24.12.0 or later, then install dependencies and configure the local
+environment:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm ci
+copy .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Fill `.env.local` with the Firebase Web SDK values, Firebase Admin credentials,
+and `GEMINI_API_KEY`. Keep Admin credentials and the Gemini key server-side;
+never prefix them with `NEXT_PUBLIC_`. For local Google Cloud development,
+Application Default Credentials can replace the service-account environment
+variables.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Configure Google sign-in in Firebase Authentication and create the Firestore
+database. User roles (`basic`, `approver`, `admin`) are stored in the `users`
+collection; privileged roles must be assigned through a trusted administrative
+process, not by the user-facing app.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Page access:
 
-## Learn More
+- `/` is public. Ticket status counters are shown only to `approver` and `admin`.
+- `/meus-chamados` and `/ai-chat` require any signed-in user.
+- `/analise-chamados` is limited to `approver` and `admin`.
+- `/gerenciamento` and its `/acompanhamento` alias are limited to `admin`.
 
-To learn more about Next.js, take a look at the following resources:
+Run the app locally with `npm run dev`. Checks available before deployment:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Production readiness
 
-## Deploy on Vercel
+- Review `.env.example` and configure secrets in the hosting provider.
+- Verify Firebase Authentication providers, Firestore indexes, and
+  `firestore.rules` in a non-production project before publishing them.
+- Set up monitoring and budget alerts for Gemini and hosting usage. API rate
+  limits are per user; they are not a global spending cap.
+- Ticket analysis currently runs synchronously in a Next.js request. Confirm
+  the hosting platform's maximum request duration can accommodate geocoding,
+  historical weather retrieval, and Gemini generation. A durable external
+  queue is not configured.
+- An interrupted processing run can be retried manually from ticket management
+  after its 15-minute lock expires; there is no automatic queue or retry worker.
+- The project has not been deployed. Do not deploy Firestore rules or
+  application changes until they have been reviewed against the target Firebase
+  project.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-=======
-
-
+Weather data is historical and does not guarantee future conditions or
+construction outcomes. Construction recommendations require review by a
+qualified professional.

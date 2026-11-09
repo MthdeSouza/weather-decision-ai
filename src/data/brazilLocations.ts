@@ -1,3 +1,5 @@
+import { BRAZIL_STATES } from "@/data/brazilStates";
+
 export type BrazilStateOption = {
   id: number;
   nome: string;
@@ -8,6 +10,34 @@ export type BrazilCityOption = {
   id: number;
   nome: string;
 };
+
+const normalizeCityName = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+
+export function getDefaultCityForState(
+  stateUf: string,
+  cities: string[],
+): string {
+  const capital = BRAZIL_STATES.find(
+    (state) => state.uf === stateUf.toUpperCase(),
+  )?.city;
+
+  if (!capital) {
+    return cities[0] ?? "";
+  }
+
+  return (
+    cities.find(
+      (city) => normalizeCityName(city) === normalizeCityName(capital),
+    ) ??
+    cities[0] ??
+    ""
+  );
+}
 
 export async function fetchBrazilStates(): Promise<BrazilStateOption[]> {
   const response = await fetch(

@@ -1,19 +1,3 @@
-// import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-
-// import { auth } from "./config";
-
-// const googleProvider = new GoogleAuthProvider();
-
-// export const loginWithGoogle = async () => {
-//   const result = await signInWithPopup(auth, googleProvider);
-
-//   return result.user;
-// };
-
-// export const logout = async () => {
-//   await signOut(auth);
-// };
-
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
@@ -23,51 +7,56 @@ import {
 } from "firebase/auth";
 
 import { auth } from "./config";
-import { getOrCreateUser } from "./users";
+import { getOrCreateUser, getUserProfileByUid } from "./users";
 
-const AUTH_COOKIE_NAME = "weather-decision-auth";
+const userSyncs = new Map<
+  string,
+  Promise<{ user: User; profile: Awaited<ReturnType<typeof getOrCreateUser>> }>
+>();
 
-const setSessionCookie = (user: User | null) => {
-  if (typeof document === "undefined") {
-    return;
-  }
-
-  if (!user) {
-    document.cookie = `${AUTH_COOKIE_NAME}=; Max-Age=0; path=/; SameSite=Lax`;
-    return;
-  }
-
-  const cookieValue = encodeURIComponent(
-    JSON.stringify({
-      uid: user.uid,
-      email: user.email ?? "",
-      name: user.displayName ?? "",
-    }),
-  );
-
-  document.cookie = `${AUTH_COOKIE_NAME}=${cookieValue}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-};
-
-export const syncLoggedUser = async (user: User) => {
-  if (!user) {
-    setSessionCookie(null);
-    return null;
-  }
-
-  const profile = await getOrCreateUser({
-    uid: user.uid,
-    displayName: user.displayName,
-    email: user.email,
-    photoURL: user.photoURL,
-    provider: user.providerData?.[0]?.providerId ?? "firebase",
+const establishServerSession = async (user: User) => {
+  const token = await user.getIdToken();
+  const response = await fetch("/api/auth/session", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
   });
 
-  setSessionCookie(user);
+  if (!response.ok) {
+    throw new Error("Não foi possível iniciar a sessão segura no servidor.");
+  }
+};
 
-  return {
-    user,
-    profile,
+export const syncLoggedUser = (user: User) => {
+  const inFlight = userSyncs.get(user.uid);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const sync = (async () => {
+    const profile =
+      (await getUserProfileByUid(user.uid)) ??
+      (await getOrCreateUser({
+        uid: user.uid,
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+        provider: user.providerData?.[0]?.providerId ?? "firebase",
+      }));
+
+    await establishServerSession(user);
+
+    return { user, profile };
+  })();
+  userSyncs.set(user.uid, sync);
+
+  const clearInFlight = () => {
+    if (userSyncs.get(user.uid) === sync) {
+      userSyncs.delete(user.uid);
+    }
   };
+  void sync.then(clearInFlight, clearInFlight);
+
+  return sync;
 };
 
 export const loginWithGoogle = async () => {
@@ -79,8 +68,14 @@ export const loginWithGoogle = async () => {
 };
 
 export const logout = async () => {
-  await signOut(auth);
-  setSessionCookie(null);
+  try {
+    const response = await fetch("/api/auth/session", { method: "DELETE" });
+    if (!response.ok) {
+      throw new Error("Não foi possível encerrar a sessão do servidor.");
+    }
+  } finally {
+    await signOut(auth);
+  }
 };
 
 export const listenToAuthChanges = (
@@ -88,12 +83,18 @@ export const listenToAuthChanges = (
 ) => {
   return onAuthStateChanged(auth, async (user) => {
     if (!user) {
-      setSessionCookie(null);
       onUser(null);
       return;
     }
 
-    const payload = await syncLoggedUser(user);
-    onUser(payload as { user: User; profile: unknown } | null);
+    try {
+      const payload = await syncLoggedUser(user);
+      onUser(payload as { user: User; profile: unknown } | null);
+    } catch (error) {
+      console.error("[auth] failed to synchronize server session", {
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      });
+      onUser(null);
+    }
   });
 };

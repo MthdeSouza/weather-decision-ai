@@ -1,74 +1,54 @@
 import { NextResponse } from "next/server";
 
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import {
+  apiErrorResponse,
+  ApiRequestError,
+  consumeApiRateLimit,
+  requireFirebaseActor,
+} from "@/lib/api-auth";
+import { adminDb } from "@/lib/firebase-admin";
 
 export async function POST(
   request: Request,
   context: { params: Promise<{ ticketId: string }> },
 ) {
   try {
+    const actor = await requireFirebaseActor(request, ["admin"]);
+    await consumeApiRateLimit(actor.uid, "ticket-archive", 20, 60 * 60 * 1000);
     const { ticketId } = await context.params;
-    const authHeader = request.headers.get("authorization");
-    const token = authHeader?.startsWith("Bearer ")
-      ? authHeader.replace("Bearer ", "")
-      : null;
 
-    if (!token) {
-      return NextResponse.json({ error: "Token ausente." }, { status: 401 });
-    }
-
-    const decodedToken = await adminAuth.verifyIdToken(token);
-    const userSnapshot = await adminDb
-      .collection("users")
-      .doc(decodedToken.uid)
-      .get();
-    const userRole = userSnapshot.data()?.role ?? "basic";
-
-    if (userRole !== "admin" && userRole !== "approver") {
-      return NextResponse.json(
-        { error: "Usuário sem permissão para arquivar chamados." },
-        { status: 403 },
-      );
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(ticketId)) {
+      throw new ApiRequestError("Identificador de chamado inválido.", 400);
     }
 
     const ticketRef = adminDb.collection("tickets").doc(ticketId);
-    const ticketSnapshot = await ticketRef.get();
+    await adminDb.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(ticketRef);
 
-    if (!ticketSnapshot.exists) {
-      return NextResponse.json(
-        { error: "Chamado não encontrado." },
-        { status: 404 },
-      );
-    }
+      if (!snapshot.exists) {
+        throw new ApiRequestError("Chamado não encontrado.", 404);
+      }
 
-    const currentTicket = ticketSnapshot.data() ?? {};
-    const previousStatus =
-      typeof currentTicket.status === "string"
-        ? currentTicket.status
-        : "pending_approval";
+      const ticket = snapshot.data() ?? {};
+      if (ticket.status === "archived") {
+        throw new ApiRequestError("O chamado já está arquivado.", 409);
+      }
 
-    await ticketRef.update({
-      status: "archived",
-      previousStatus:
-        previousStatus === "archived"
-          ? (currentTicket.previousStatus ?? previousStatus)
-          : previousStatus,
-      archivedBy: {
-        uid: decodedToken.uid,
-        name: decodedToken.name ?? "Usuário",
-        email: decodedToken.email ?? "",
-      },
-      archivedAt: new Date(),
-      updatedAt: new Date(),
+      transaction.update(ticketRef, {
+        status: "archived",
+        previousStatus: ticket.status,
+        archivedBy: {
+          uid: actor.uid,
+          name: actor.name,
+          email: actor.email,
+        },
+        archivedAt: new Date(),
+        updatedAt: new Date(),
+      });
     });
 
     return NextResponse.json({ ok: true, ticketId, status: "archived" });
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Não foi possível arquivar o chamado.";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiErrorResponse(error, "ticket-archive");
   }
 }

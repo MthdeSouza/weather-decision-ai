@@ -1,7 +1,15 @@
 import { randomUUID } from "node:crypto";
 
 import { adminDb } from "@/lib/firebase-admin";
-import { getHistoricalClimateContext } from "@/lib/open-meteo";
+import {
+  getHistoricalClimateContext,
+  type HistoricalClimateContext,
+} from "@/lib/open-meteo";
+import { createProcessingDiagnostics as buildProcessingDiagnostics } from "@/lib/processing-diagnostics";
+import {
+  canBeginTicketProcessing,
+  isProcessingRunStale,
+} from "@/lib/ticket-workflow";
 import {
   AI_ANALYSIS_PROMPT_VERSION,
   generateConstructionAnalysisReport,
@@ -23,31 +31,7 @@ export type TicketProcessingResult = {
   error?: string;
 };
 
-export function createProcessingDiagnostics(error: unknown, stage: string) {
-  const raw =
-    error instanceof Error
-      ? error.message
-      : String(error ?? "Erro desconhecido");
-  const sanitized = raw
-    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]")
-    .replace(/AIza[0-9A-Za-z\-_]+/g, "[redacted]")
-    .replace(
-      /\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/g,
-      "[redacted-email]",
-    )
-    .slice(0, 500);
-
-  return {
-    stage,
-    errorType: stage.includes("clima")
-      ? "climate_api_error"
-      : stage.includes("gemini")
-        ? "gemini_api_error"
-        : "processing_error",
-    message: sanitized,
-    createdAt: new Date().toISOString(),
-  };
-}
+export const createProcessingDiagnostics = buildProcessingDiagnostics;
 
 export async function beginTicketProcessing(
   ticketId: string,
@@ -56,7 +40,7 @@ export async function beginTicketProcessing(
   const ticketRef = adminDb.collection("tickets").doc(ticketId);
   const runId = `analysis-${Date.now()}-${randomUUID()}`;
 
-  await adminDb.runTransaction(async (transaction: any) => {
+  await adminDb.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(ticketRef);
 
     if (!snapshot.exists) {
@@ -67,22 +51,16 @@ export async function beginTicketProcessing(
     const currentStatus =
       typeof ticket.status === "string" ? ticket.status : "";
 
-    const allowsReanalysis = [
-      "rejected",
-      "failed",
-      "pending_ai_analysis",
-      "completed",
-    ].includes(currentStatus);
+    const allowsReanalysis =
+      canBeginTicketProcessing(currentStatus) ||
+      (currentStatus === "processing" &&
+        isProcessingRunStale(ticket.processingStartedAt));
 
-    if (currentStatus === "processing") {
+    if (currentStatus === "processing" && !allowsReanalysis) {
       throw new Error("Este chamado já está em processamento.");
     }
 
-    if (
-      currentStatus &&
-      !allowsReanalysis &&
-      currentStatus !== "pending_approval"
-    ) {
+    if (!allowsReanalysis) {
       throw new Error(
         `Este chamado não está em um status elegível para nova análise: ${currentStatus}.`,
       );
@@ -98,8 +76,8 @@ export async function beginTicketProcessing(
         role: actor.role ?? "approver",
       },
       processingStartedAt: new Date(),
-      iaAnalysis: allowsReanalysis ? null : (ticket.iaAnalysis ?? null),
-      aiAnalysisMeta: allowsReanalysis ? null : (ticket.aiAnalysisMeta ?? null),
+      iaAnalysis: null,
+      aiAnalysisMeta: null,
       processingDiagnostics: null,
       updatedAt: new Date(),
     });
@@ -112,29 +90,35 @@ export async function finalizeTicketAnalysis(
   ticketId: string,
   runId: string,
   report: Record<string, unknown>,
+  climateContext: HistoricalClimateContext,
 ) {
   const ticketRef = adminDb.collection("tickets").doc(ticketId);
 
-  await adminDb.runTransaction(async (transaction: any) => {
+  await adminDb.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(ticketRef);
 
     if (!snapshot.exists) {
       throw new Error("Chamado não encontrado ao finalizar análise.");
     }
 
-    const currentRunId = snapshot.data()?.processingRunId;
+    const ticket = snapshot.data() ?? {};
+    const currentRunId = ticket.processingRunId;
 
-    if (currentRunId && currentRunId !== runId) {
+    if (
+      currentRunId !== runId ||
+      ticket.status !== "processing"
+    ) {
       throw new Error("Outra execução substituiu esta análise em andamento.");
     }
 
+    const executedAt = new Date();
     transaction.update(ticketRef, {
       status: "completed",
       iaAnalysis: JSON.stringify(report, null, 2),
       aiAnalysisMeta: {
-        id: `analysis-${Date.now()}`,
-        executedAt: new Date().toISOString(),
-        model: "gemini-3.8-flash",
+        id: runId,
+        executedAt: executedAt.toISOString(),
+        model: "gemini-2.5-flash",
         promptVersion: AI_ANALYSIS_PROMPT_VERSION,
         dataSources: [
           "Open-Meteo Historical Weather API (ERA5-LAND)",
@@ -144,9 +128,10 @@ export async function finalizeTicketAnalysis(
         status: "completed",
         result: report,
       },
+      climateContext,
       processingRunId: runId,
-      processingFinishedAt: new Date(),
-      updatedAt: new Date(),
+      processingFinishedAt: executedAt,
+      updatedAt: executedAt,
     });
   });
 }
@@ -160,16 +145,20 @@ export async function markTicketAnalysisFailed(
   const ticketRef = adminDb.collection("tickets").doc(ticketId);
   const diagnostic = createProcessingDiagnostics(error, stage);
 
-  await adminDb.runTransaction(async (transaction: any) => {
+  await adminDb.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(ticketRef);
 
     if (!snapshot.exists) {
       throw new Error("Chamado não encontrado ao registrar falha.");
     }
 
-    const currentRunId = snapshot.data()?.processingRunId;
+    const ticket = snapshot.data() ?? {};
+    const currentRunId = ticket.processingRunId;
 
-    if (currentRunId && currentRunId !== runId) {
+    if (
+      currentRunId !== runId ||
+      ticket.status !== "processing"
+    ) {
       return;
     }
 
@@ -220,7 +209,7 @@ export async function processApprovedTicket(
         ? construction.constructionType
         : "mixed";
 
-    let climateContext: Record<string, unknown> | null = null;
+    let climateContext: HistoricalClimateContext;
     try {
       climateContext = await getHistoricalClimateContext({
         city,
@@ -252,16 +241,21 @@ export async function processApprovedTicket(
         startDate,
         estimatedMonths,
       },
-      climateContext: climateContext as never,
+      climateContext,
     });
 
-    await finalizeTicketAnalysis(ticketId, runId, report);
+    await finalizeTicketAnalysis(
+      ticketId,
+      runId,
+      report,
+      climateContext,
+    );
 
     return {
       ok: true,
       status: "completed",
       ticketId,
-      analysisId: `analysis-${Date.now()}`,
+      analysisId: runId,
       report,
     };
   } catch (error) {
@@ -284,9 +278,18 @@ export async function processApprovedTicket(
     const diagnostic = createProcessingDiagnostics(error, stage);
 
     if (runId) {
-      await markTicketAnalysisFailed(ticketId, runId, error, stage).catch(
-        () => undefined,
-      );
+      try {
+        await markTicketAnalysisFailed(ticketId, runId, error, stage);
+      } catch (persistError) {
+        console.error("[ticket-processing] could not persist failure state", {
+          ticketId,
+          runId,
+          errorType:
+            persistError instanceof Error
+              ? persistError.name
+              : "UnknownError",
+        });
+      }
     }
 
     return {

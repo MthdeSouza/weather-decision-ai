@@ -6,16 +6,15 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  updateDoc,
   where,
 } from "firebase/firestore";
 
 import { auth, db } from "@/services/firebase/config";
 import { getUserProfileByUid } from "@/services/firebase/users";
+import { initialTicketStatus } from "@/lib/ticket-workflow";
 import type {
   Ticket,
   TicketCreateInput,
-  TicketDecisionInput,
   TicketStatus,
 } from "@/types/ticket";
 import type { UserRole } from "@/types/user";
@@ -69,8 +68,7 @@ export async function createTicket(input: TicketCreateInput) {
   }
 
   const ticketRef = doc(ticketsCollection);
-  const status: TicketStatus =
-    user.role === "basic" ? "pending_approval" : "pending_ai_analysis";
+  const status: TicketStatus = initialTicketStatus(user.role);
 
   const payload: Ticket = {
     id: ticketRef.id,
@@ -298,70 +296,6 @@ export async function getTicketById(ticketId: string) {
     ...ticketData,
     id: snapshot.id,
   } as Ticket;
-}
-
-export async function archiveTicket(
-  ticketId: string,
-  actor: TicketDecisionInput["reviewer"],
-) {
-  const ticketRef = doc(db, "tickets", ticketId);
-  const snapshot = await getDoc(ticketRef);
-
-  if (!snapshot.exists()) {
-    throw new Error("Chamado não encontrado.");
-  }
-
-  const currentTicket = snapshot.data() as Ticket;
-
-  await updateDoc(ticketRef, {
-    status: "archived",
-    previousStatus:
-      currentTicket.status === "archived"
-        ? (currentTicket.previousStatus ?? currentTicket.status)
-        : currentTicket.status,
-    archivedBy: actor,
-    archivedAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-}
-
-export async function approveTicket(
-  ticketId: string,
-  reviewer: TicketDecisionInput["reviewer"],
-) {
-  const ticketRef = doc(db, "tickets", ticketId);
-
-  await updateDoc(ticketRef, {
-    status: "pending_ai_analysis",
-    approval: {
-      approvedBy: reviewer,
-      approvedAt: serverTimestamp(),
-      rejectedBy: null,
-      rejectedAt: null,
-      rejectionReason: null,
-    },
-    updatedAt: serverTimestamp(),
-  });
-}
-
-export async function rejectTicket(
-  ticketId: string,
-  reviewer: TicketDecisionInput["reviewer"],
-  reason: string,
-) {
-  const ticketRef = doc(db, "tickets", ticketId);
-
-  await updateDoc(ticketRef, {
-    status: "rejected",
-    approval: {
-      approvedBy: null,
-      approvedAt: null,
-      rejectedBy: reviewer,
-      rejectedAt: serverTimestamp(),
-      rejectionReason: reason.trim(),
-    },
-    updatedAt: serverTimestamp(),
-  });
 }
 
 export { filterAndSortTickets } from "./ticket-filters";

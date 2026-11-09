@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 
 import { CONSTRUCTION_TYPES, PROPERTY_TYPES } from "@/constants/tickets";
-import { fetchBrazilStates, fetchCitiesByState } from "@/data/brazilLocations";
+import {
+  fetchBrazilStates,
+  fetchCitiesByState,
+  getDefaultCityForState,
+} from "@/data/brazilLocations";
 import { createTicket } from "@/services/tickets";
 import type { TicketCreateInput } from "@/types/ticket";
 
@@ -56,34 +60,43 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
 
   useEffect(() => {
     if (!form.state) {
-      setCityOptions([]);
-      setForm((current) => ({ ...current, city: "" }));
       return;
     }
+
+    let active = true;
 
     async function loadCities() {
       setIsLoadingCities(true);
 
       try {
         const cities = await fetchCitiesByState(form.state);
+        if (!active) {
+          return;
+        }
+
         setCityOptions(cities);
 
         setForm((current) => ({
           ...current,
-          city:
-            current.city && cities.includes(current.city)
-              ? current.city
-              : (cities[0] ?? ""),
+          city: getDefaultCityForState(form.state, cities),
         }));
       } catch {
-        setCityOptions([]);
-        setForm((current) => ({ ...current, city: "" }));
+        if (active) {
+          setCityOptions([]);
+          setForm((current) => ({ ...current, city: "" }));
+        }
       } finally {
-        setIsLoadingCities(false);
+        if (active) {
+          setIsLoadingCities(false);
+        }
       }
     }
 
     void loadCities();
+
+    return () => {
+      active = false;
+    };
   }, [form.state]);
 
   const validate = () => {
@@ -133,14 +146,20 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
     field: keyof TicketCreateInput,
     value: string | number,
   ) => {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
-
     if (field === "state") {
+      setForm((current) => ({
+        ...current,
+        state: String(value),
+        city: "",
+      }));
+      setCityOptions([]);
       setCitySearch("");
       setIsCityOpen(false);
+    } else {
+      setForm((current) => ({
+        ...current,
+        [field]: value,
+      }));
     }
 
     if (field === "city") {
@@ -426,7 +445,7 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="inline-flex items-center justify-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+        className="cursor-pointer inline-flex items-center justify-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isSubmitting ? "Enviando..." : "Abrir chamado"}
       </button>

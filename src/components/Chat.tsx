@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Message } from "@/components/Message";
 import { fetchBrazilStates, fetchCitiesByState } from "@/data/brazilLocations";
+import { auth } from "@/services/firebase/config";
 import type { Message as ChatMessage } from "@/types/chat";
 
 const initialMessages: ChatMessage[] = [
@@ -49,8 +50,6 @@ export function Chat() {
 
   useEffect(() => {
     if (!selectedState) {
-      setCityOptions([]);
-      setCity("");
       return;
     }
 
@@ -97,10 +96,16 @@ export function Chat() {
     setIsLoading(true);
 
     try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        throw new Error("Sua sessão expirou. Entre novamente.");
+      }
+
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           message: finalMessage,
@@ -108,9 +113,7 @@ export function Chat() {
           state: selectedStateName || undefined,
         }),
       });
-
       const data = await response.json();
-      console.log("data", data);
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
@@ -121,7 +124,7 @@ export function Chat() {
       };
 
       setMessages((previous) => [...previous, assistantMessage]);
-    } catch (error) {
+    } catch {
       setMessages((previous) => [
         ...previous,
         {

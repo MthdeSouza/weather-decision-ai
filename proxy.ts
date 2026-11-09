@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 const AUTH_COOKIE_NAME = "weather-decision-auth";
 
-export function middleware(request: Request) {
+export function proxy(request: NextRequest) {
   const url = new URL(request.url);
   const { pathname } = url;
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", pathname);
 
   const isPublicPath =
     pathname === "/" ||
@@ -13,7 +16,7 @@ export function middleware(request: Request) {
     pathname.startsWith("/api");
 
   if (isPublicPath) {
-    return NextResponse.next();
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   const protectedRoutes = [
@@ -21,6 +24,8 @@ export function middleware(request: Request) {
     "/ai-chat",
     "/meus-chamados",
     "/analise-chamados",
+    "/gerenciamento",
+    "/acompanhamento",
   ];
 
   const isProtectedPath = protectedRoutes.includes(pathname);
@@ -35,7 +40,7 @@ export function middleware(request: Request) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {
