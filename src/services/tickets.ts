@@ -155,6 +155,99 @@ export async function getPendingApprovalTickets() {
     );
 }
 
+export type TicketDashboardStats = {
+  total: number;
+  pendingApproval: number;
+  pendingAiAnalysis: number;
+  processing: number;
+  completed: number;
+  rejected: number;
+  failed: number;
+};
+
+export const emptyTicketDashboardStats: TicketDashboardStats = {
+  total: 0,
+  pendingApproval: 0,
+  pendingAiAnalysis: 0,
+  processing: 0,
+  completed: 0,
+  rejected: 0,
+  failed: 0,
+};
+
+export function calculateTicketDashboardStats(
+  tickets: Ticket[],
+): TicketDashboardStats {
+  const stats = { ...emptyTicketDashboardStats };
+
+  for (const ticket of tickets) {
+    stats.total += 1;
+
+    if (ticket.status === "pending_approval") {
+      stats.pendingApproval += 1;
+    }
+
+    if (ticket.status === "pending_ai_analysis") {
+      stats.pendingAiAnalysis += 1;
+    }
+
+    if (ticket.status === "processing") {
+      stats.processing += 1;
+    }
+
+    if (ticket.status === "completed") {
+      stats.completed += 1;
+    }
+
+    if (ticket.status === "rejected") {
+      stats.rejected += 1;
+    }
+
+    if (ticket.status === "failed") {
+      stats.failed += 1;
+    }
+  }
+
+  return stats;
+}
+
+export async function getDashboardTickets(): Promise<Ticket[]> {
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    return [];
+  }
+
+  const profile = await getCurrentAuthUser();
+
+  if (!profile) {
+    return [];
+  }
+
+  const isPrivileged = profile.role === "approver" || profile.role === "admin";
+  const q = isPrivileged
+    ? ticketsCollection
+    : query(ticketsCollection, where("createdBy.uid", "==", profile.uid));
+
+  const snapshot = isPrivileged
+    ? await getDocs(q as never)
+    : await getDocs(q as typeof q);
+
+  return snapshot.docs
+    .map((ticketDoc) => {
+      const { id: _ignoredId, ...ticketData } = ticketDoc.data() as Ticket;
+
+      return {
+        ...ticketData,
+        id: ticketDoc.id,
+      } as Ticket;
+    })
+    .sort(
+      (a, b) =>
+        getTimestampMillis(b.createdAt) - getTimestampMillis(a.createdAt),
+    );
+}
+
 export async function getTicketById(ticketId: string) {
   const ticketRef = doc(db, "tickets", ticketId);
   const snapshot = await getDoc(ticketRef);
