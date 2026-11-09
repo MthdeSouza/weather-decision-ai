@@ -1,6 +1,6 @@
 export default function FuturePage() {
   return (
-    <main className="min-h-screen bg-slate-100 px-6 py-10 dark:bg-slate-950">
+    <main className="h-full min-h-0 overflow-y-auto bg-slate-100 px-6 py-10 dark:bg-slate-950">
       <div className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
           Próxima etapa

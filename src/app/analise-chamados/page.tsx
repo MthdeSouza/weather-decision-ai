@@ -157,7 +157,7 @@ export default function AnalysisPage() {
 
   if (!isAuthorized) {
     return (
-      <main className="min-h-screen bg-slate-100 px-6 py-10 dark:bg-slate-950">
+      <main className="h-full min-h-0 overflow-y-auto bg-slate-100 px-6 py-10 dark:bg-slate-950">
         <div className="mx-auto max-w-2xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
             Acesso restrito
@@ -175,27 +175,15 @@ export default function AnalysisPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-8 dark:bg-slate-950">
-      <div className="mx-auto max-w-7xl space-y-6">
-        {/* <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
-            Aprovação
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-50">
-            Análise de chamados
-          </h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Perfil atual:{" "}
-            <span className="font-semibold capitalize">{role}</span>
-          </p>
-        </header> */}
-        <header className="flex items-center justify-between gap-3">
+    <main className="h-full min-h-0 overflow-hidden bg-slate-100 dark:bg-slate-950">
+      <section className="mx-auto flex h-full min-h-0 max-w-7xl flex-col gap-4 overflow-hidden px-4 py-4">
+        <header className="flex shrink-0 items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
-              MINHA ÁREA
+              OPERAÇÃO
             </p>
             <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-50">
-              Meus Chamados
+              Análise de chamados
             </h1>
           </div>
         </header>
@@ -214,13 +202,13 @@ export default function AnalysisPage() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
-            <aside className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+          <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-4 lg:grid-cols-[420px_minmax(0,1fr)] lg:grid-rows-1">
+            <aside className="flex min-h-0 flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <h2 className="shrink-0 text-lg font-semibold text-slate-900 dark:text-slate-50">
                 Fila de aprovação
               </h2>
 
-              <div className="space-y-3">
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                 {tickets.map((ticket) => (
                   <button
                     key={ticket.id}
@@ -264,7 +252,7 @@ export default function AnalysisPage() {
             </aside>
 
             {selectedTicket ? (
-              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <section className="min-h-0 overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
@@ -380,7 +368,7 @@ export default function AnalysisPage() {
             ) : null}
           </div>
         )}
-      </div>
+      </section>
     </main>
   );
 }

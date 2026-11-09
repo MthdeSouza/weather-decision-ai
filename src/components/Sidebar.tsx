@@ -103,7 +103,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="w-64 border-r border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
+    <aside className="flex h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
       <div className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
           Weather
@@ -134,7 +134,7 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-800">
+      <div className="mt-auto border-t border-slate-200 pt-4 dark:border-slate-800">
         {isAuthenticated ? (
           <div className="space-y-3">
             <div className="text-sm text-slate-600 dark:text-slate-300">

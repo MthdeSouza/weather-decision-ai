@@ -7,7 +7,7 @@ import { TicketForm } from "@/components/TicketForm";
 import { TicketList } from "@/components/TicketList";
 import { TICKET_STATUS_LABELS } from "@/constants/tickets";
 import { auth } from "@/services/firebase/config";
-import { getMyTickets } from "@/services/tickets";
+import { filterAndSortTickets, getMyTickets } from "@/services/tickets";
 import type { Ticket, TicketStatus } from "@/types/ticket";
 import { getConstructionLabel, getPropertyLabel } from "@/utils/helpers";
 
@@ -37,6 +37,11 @@ const safeParseReport = (ticket: Ticket | null) => {
 export default function MyTicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [statusFilter, setStatusFilter] = useState<"all" | TicketStatus>("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [sortBy, setSortBy] = useState<"recent" | "oldest" | "status">(
+    "recent",
+  );
   // const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -65,13 +70,17 @@ export default function MyTicketsPage() {
     return () => unsubscribe();
   }, []);
 
-  const filteredTickets = useMemo(() => {
-    if (statusFilter === "all") {
-      return tickets;
-    }
-
-    return tickets.filter((ticket) => ticket.status === statusFilter);
-  }, [statusFilter, tickets]);
+  const filteredTickets = useMemo(
+    () =>
+      filterAndSortTickets({
+        tickets,
+        status: statusFilter,
+        fromDate,
+        toDate,
+        sortBy,
+      }),
+    [fromDate, sortBy, statusFilter, tickets, toDate],
+  );
 
   const selectedTicket = useMemo(
     () =>
@@ -197,9 +206,10 @@ export default function MyTicketsPage() {
   // }
 
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-950">
-      <section className="flex flex-col mx-auto max-w-7xl px-4 py-8 gap-8">
-        <header className="flex items-center justify-between gap-3">
+    <main className="h-full min-h-0 overflow-hidden bg-slate-100 dark:bg-slate-950 ">
+      {/* <main className="h-full min-h-0 overflow-hidden bg-slate-100 dark:bg-slate-950"> */}
+      <section className="mx-auto flex h-full min-h-0 max-w-7xl flex-col gap-4 overflow-hidden px-4 py-8">
+        <header className="flex shrink-0 items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
               MINHA ÁREA
@@ -209,54 +219,86 @@ export default function MyTicketsPage() {
             </h1>
           </div>
         </header>
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          {/* <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
-            Minha área
-          </p> */}
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            {/* <div>
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">
-                Meus chamados
-              </h1>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                Usuário: {userName}
-              </p>
-            </div> */}
+        <section className="shrink-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-col gap-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              <label className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                <span>Status</span>
+                <select
+                  value={statusFilter}
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as "all" | TicketStatus)
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-900 outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                >
+                  <option value="all">Todos os status</option>
+                  {Object.entries(TICKET_STATUS_LABELS)
+                    .filter(([key]) => key !== "archived")
+                    .map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                </select>
+              </label>
 
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="cursor-pointer inline-flex items-center justify-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-500"
-            >
-              Abrir chamado
-            </button>
+              <label className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                <span>Data inicial</span>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(event) => setFromDate(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-900 outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              </label>
+
+              <label className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                <span>Data final</span>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(event) => setToDate(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-900 outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              </label>
+
+              <label className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                <span>Ordenar por</span>
+                <select
+                  value={sortBy}
+                  onChange={(event) =>
+                    setSortBy(
+                      event.target.value as "recent" | "oldest" | "status",
+                    )
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-900 outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                >
+                  <option value="recent">Mais recentes</option>
+                  <option value="oldest">Mais antigos</option>
+                  <option value="status">Status</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="cursor-pointer inline-flex items-center justify-center rounded-lg border border-sky-200 bg-sky-50 text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:bg-sky-500/20 dark:disabled:border-slate-700 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+                // className="cursor-pointer inline-flex w-fit items-center justify-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-500"
+              >
+                Novo chamado
+              </button>
+            </div>
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <section className="flex min-h-0 flex-1 flex-col rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="mb-4 flex shrink-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
               Chamados cadastrados
             </h2>
-
-            <select
-              value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(event.target.value as "all" | TicketStatus)
-              }
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-            >
-              <option value="all">Todos os status</option>
-              {Object.entries(TICKET_STATUS_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-            <div className="min-w-0">
+          <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-4 lg:grid-cols-[260px_minmax(0,1fr)] lg:grid-rows-1">
+            <div className="min-h-0 min-w-0 overflow-y-auto pr-1">
               <TicketList
                 loading={loading}
                 tickets={filteredTickets}
@@ -267,7 +309,7 @@ export default function MyTicketsPage() {
               />
             </div>
 
-            <div className="min-w-0 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-950">
+            <div className="min-h-0 min-w-0 overflow-y-auto rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-950">
               {selectedTicket ? (
                 <div className="space-y-6">
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -765,7 +807,7 @@ export default function MyTicketsPage() {
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
               <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                Abrir chamado
+                Novo chamado
               </h3>
 
               <button

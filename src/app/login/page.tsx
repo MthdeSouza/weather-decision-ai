@@ -55,7 +55,7 @@ export default function LoginPage() {
   }, [callbackUrl, router]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 dark:bg-slate-950">
+    <main className="flex h-full min-h-0 items-center justify-center overflow-y-auto bg-slate-100 px-4 dark:bg-slate-950">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-6">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">

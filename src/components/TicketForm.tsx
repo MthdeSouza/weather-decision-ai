@@ -209,7 +209,7 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
             Nova análise
           </p>
           <h2 className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-50">
-            Abrir chamado
+            Novo chamado
           </h2>
         </div>
       </div>

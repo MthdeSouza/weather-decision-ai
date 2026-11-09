@@ -219,7 +219,7 @@ export default function TicketTrackingPage() {
 
   if (!isAuthorized) {
     return (
-      <main className="min-h-screen bg-slate-100 px-6 py-10 dark:bg-slate-950">
+      <main className="h-full min-h-0 overflow-y-auto bg-slate-100 px-6 py-10 dark:bg-slate-950">
         <div className="mx-auto max-w-2xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
             Acesso restrito
@@ -237,9 +237,9 @@ export default function TicketTrackingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-8 dark:bg-slate-950">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <header className="flex items-center justify-between gap-3">
+    <main className="h-full min-h-0 overflow-hidden bg-slate-100 dark:bg-slate-950">
+      <section className="mx-auto flex h-full min-h-0 max-w-7xl flex-col gap-4 overflow-hidden px-4 py-4">
+        <header className="flex shrink-0 items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
               Operação
@@ -250,7 +250,7 @@ export default function TicketTrackingPage() {
           </div>
         </header>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section className="shrink-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <label className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
               <span>Status</span>
@@ -336,16 +336,16 @@ export default function TicketTrackingPage() {
             Carregando tickets...
           </div>
         ) : (
-          <div className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
                 Tickets ({visibleTickets.length})
               </h2>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="min-h-0 flex-1 overflow-auto">
               <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
+                <thead className="sticky top-0 bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
                   <tr>
                     <th className="px-5 py-3 font-medium">Ticket</th>
                     <th className="px-5 py-3 font-medium">Solicitante</th>
@@ -491,7 +491,7 @@ export default function TicketTrackingPage() {
             </div>
           </div>
         )}
-      </div>
+      </section>
 
       {confirmAction ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">

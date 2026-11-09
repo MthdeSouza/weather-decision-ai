@@ -94,7 +94,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-950">
+    <main className="h-full min-h-0 overflow-y-auto bg-slate-100 dark:bg-slate-950">
       <section className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8">
         <header className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
@@ -102,7 +102,7 @@ export default function HomePage() {
               Brasil em tempo real
             </p>
             <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-50">
-              Dashboard
+              Home
             </h1>
           </div>
 
@@ -125,41 +125,41 @@ export default function HomePage() {
           <>
             {role === "admin" || role === "approver" ? (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
-              <StatCard
-                label="Total"
-                value={stats.total}
-                accent="text-slate-900 dark:text-slate-50"
-              />
-              <StatCard
-                label="Pendentes"
-                value={stats.pendingApproval}
-                accent="text-amber-600 dark:text-amber-300"
-              />
-              <StatCard
-                label="Aguardando IA"
-                value={stats.pendingAiAnalysis}
-                accent="text-sky-600 dark:text-sky-300"
-              />
-              <StatCard
-                label="Em processamento"
-                value={stats.processing}
-                accent="text-violet-600 dark:text-violet-300"
-              />
-              <StatCard
-                label="Concluídos"
-                value={stats.completed}
-                accent="text-emerald-600 dark:text-emerald-300"
-              />
-              <StatCard
-                label="Falhas"
-                value={stats.failed}
-                accent="text-rose-600 dark:text-rose-300"
-              />
-              <StatCard
-                label="Rejeitados"
-                value={stats.rejected}
-                accent="text-rose-600 dark:text-rose-300"
-              />
+                <StatCard
+                  label="Total"
+                  value={stats.total}
+                  accent="text-slate-900 dark:text-slate-50"
+                />
+                <StatCard
+                  label="Pendentes"
+                  value={stats.pendingApproval}
+                  accent="text-amber-600 dark:text-amber-300"
+                />
+                <StatCard
+                  label="Aguardando IA"
+                  value={stats.pendingAiAnalysis}
+                  accent="text-sky-600 dark:text-sky-300"
+                />
+                <StatCard
+                  label="Em processamento"
+                  value={stats.processing}
+                  accent="text-violet-600 dark:text-violet-300"
+                />
+                <StatCard
+                  label="Concluídos"
+                  value={stats.completed}
+                  accent="text-emerald-600 dark:text-emerald-300"
+                />
+                <StatCard
+                  label="Falhas"
+                  value={stats.failed}
+                  accent="text-rose-600 dark:text-rose-300"
+                />
+                <StatCard
+                  label="Rejeitados"
+                  value={stats.rejected}
+                  accent="text-rose-600 dark:text-rose-300"
+                />
               </div>
             ) : null}
 
