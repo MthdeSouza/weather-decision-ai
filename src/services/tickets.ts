@@ -81,6 +81,8 @@ export async function createTicket(input: TicketCreateInput) {
       rejectionReason: null,
     },
     iaAnalysis: null,
+    aiAnalysisMeta: null,
+    climateContext: null,
     createdAt: serverTimestamp() as never,
     updatedAt: serverTimestamp() as never,
   };

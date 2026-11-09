@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
+import { evaluateConstructionScenarios } from "../lib/climate-scenarios";
+import { getHistoricalClimateContext } from "../lib/open-meteo";
+
 import { analyzeDecision } from "./gemini";
 import { getWeatherSummary } from "./weather";
 
@@ -89,6 +92,107 @@ describe("getWeatherSummary", () => {
     assert.ok(result);
     assert.ok(result.summary);
     assert.match(result.summary, /Lisboa/i);
+    assert.ok(result.recommendation.length > 0);
+  });
+
+  it("builds a historical climate context from Open-Meteo geocoding and archive responses", async () => {
+    global.fetch = async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes("geocoding-api.open-meteo.com")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                name: "São Paulo",
+                admin1: "São Paulo",
+                country: "Brazil",
+                latitude: -23.55,
+                longitude: -46.63,
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      if (url.includes("archive-api.open-meteo.com")) {
+        return new Response(
+          JSON.stringify({
+            daily: {
+              time: ["2023-01-01", "2023-01-02", "2023-01-03"],
+              precipitation_sum: [1.2, 10.5, 0.4],
+              temperature_2m_mean: [24.5, 27.0, 26.1],
+              temperature_2m_max: [30, 34, 31],
+              relative_humidity_2m_mean: [65, 70, 68],
+              wind_speed_10m_max: [22, 18, 29],
+              wind_gusts_10m_max: [38, 45, 52],
+              weather_code: [0, 80, 95],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const context = await getHistoricalClimateContext({
+      city: "São Paulo",
+      state: "São Paulo",
+      startDate: "2024-01-10",
+    });
+
+    assert.equal(context.location.name, "São Paulo");
+    assert.equal(context.location.state, "São Paulo");
+    assert.ok(context.summary.averageTemperatureC > 0);
+    assert.ok(context.summary.rainyDays >= 1);
+    assert.ok(context.source.includes("Open-Meteo"));
+  });
+
+  it("evaluates the 12 possible start months and compares scenario risk deterministically", async () => {
+    const climateContext = {
+      location: {
+        name: "São Paulo",
+        state: "São Paulo",
+        country: "Brazil",
+        latitude: -23.55,
+        longitude: -46.63,
+      },
+      source: "Open-Meteo Historical Weather API (ERA5-Land)",
+      period: {
+        startDate: "2023-01-01",
+        endDate: "2025-12-31",
+        daysAnalyzed: 365,
+      },
+      summary: {
+        precipitationAverageMm: 120,
+        rainyDays: 80,
+        averageTemperatureC: 22,
+        intenseHeatDays: 10,
+        averageHumidityPercent: 72,
+        maxWindKmh: 50,
+        strongGustDays: 5,
+        adverseWeatherDays: 12,
+      },
+      notes: "Histórico climático de teste.",
+    };
+
+    const result = evaluateConstructionScenarios({
+      climateContext,
+      plannedStartDate: "2025-02-10",
+      estimatedMonths: 6,
+      stages: [
+        { name: "Fundação", durationMonths: 2, climateSensitivity: 1.2 },
+        { name: "Estrutura", durationMonths: 2, climateSensitivity: 1.5 },
+        { name: "Acabamento", durationMonths: 2, climateSensitivity: 0.8 },
+      ],
+    });
+
+    assert.ok(result.scenarios.length === 12);
+    assert.ok(result.scenarios.every((scenario) => scenario.score >= 0));
+    assert.ok(result.bestStartMonth);
+    assert.ok(result.worstStartMonth);
     assert.ok(result.recommendation.length > 0);
   });
 });

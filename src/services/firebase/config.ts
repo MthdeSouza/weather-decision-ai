@@ -3,14 +3,43 @@ import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
+const requireEnv = (name: string, value: string | undefined): string => {
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return value;
+};
+
 const firebaseConfig = {
-  apiKey: "AIzaSyCQKM8dI8cJWHXocUkQAcs3hPeSNpOSNGo",
-  authDomain: "weather-decision-ai-dev.firebaseapp.com",
-  projectId: "weather-decision-ai-dev",
-  storageBucket: "weather-decision-ai-dev.firebasestorage.app",
-  messagingSenderId: "103714559297",
-  appId: "1:103714559297:web:24f3c498e6b4f182567dc0",
-  measurementId: "G-N7QKNMPD6P",
+  apiKey: requireEnv(
+    "NEXT_PUBLIC_FIREBASE_API_KEY",
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  ),
+  authDomain: requireEnv(
+    "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  ),
+  projectId: requireEnv(
+    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  ),
+  storageBucket: requireEnv(
+    "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  ),
+  messagingSenderId: requireEnv(
+    "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  ),
+  appId: requireEnv(
+    "NEXT_PUBLIC_FIREBASE_APP_ID",
+    process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  ),
+  measurementId: requireEnv(
+    "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID",
+    process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  ),
 };
 
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);

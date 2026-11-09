@@ -48,6 +48,43 @@ export interface TicketApproval {
   rejectionReason: string | null;
 }
 
+export interface TicketClimateContext {
+  location: {
+    name: string;
+    state: string;
+    country: string;
+    latitude: number;
+    longitude: number;
+  };
+  source: string;
+  period: {
+    startDate: string;
+    endDate: string;
+    daysAnalyzed: number;
+  };
+  summary: {
+    precipitationAverageMm: number;
+    rainyDays: number;
+    averageTemperatureC: number;
+    intenseHeatDays: number;
+    averageHumidityPercent: number;
+    maxWindKmh: number;
+    strongGustDays: number;
+    adverseWeatherDays: number;
+  };
+  notes: string;
+}
+
+export interface TicketAiAnalysisMeta {
+  id: string;
+  executedAt: string;
+  model: string;
+  promptVersion: string;
+  dataSources: string[];
+  status: "completed" | "failed";
+  result: Record<string, unknown> | null;
+}
+
 export interface Ticket {
   id: string;
   createdBy: TicketUserRef;
@@ -55,6 +92,8 @@ export interface Ticket {
   status: TicketStatus;
   approval: TicketApproval;
   iaAnalysis: string | null;
+  aiAnalysisMeta: TicketAiAnalysisMeta | null;
+  climateContext: TicketClimateContext | null;
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
 }

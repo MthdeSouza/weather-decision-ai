@@ -11,7 +11,6 @@ import {
 } from "@/constants/tickets";
 import { auth } from "@/services/firebase/config";
 import {
-  approveTicket,
   getCurrentAuthUser,
   getPendingApprovalTickets,
   rejectTicket,
@@ -96,11 +95,34 @@ export default function AnalysisPage() {
       return;
     }
 
-    await approveTicket(ticketId, {
-      uid: reviewer.uid,
-      name: reviewer.name,
-      email: reviewer.email,
+    const currentToken = await auth.currentUser?.getIdToken();
+    if (!currentToken) {
+      window.alert("Sessão do usuário indisponível para aprovar o chamado.");
+      return;
+    }
+
+    const response = await fetch("/api/tickets/approve", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${currentToken}`,
+      },
+      body: JSON.stringify({
+        ticketId,
+        reviewer: {
+          uid: reviewer.uid,
+          name: reviewer.name,
+          email: reviewer.email,
+        },
+      }),
     });
+
+    const payload = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      window.alert(payload.error ?? "Não foi possível aprovar o chamado.");
+      return;
+    }
 
     await loadTickets();
   };
