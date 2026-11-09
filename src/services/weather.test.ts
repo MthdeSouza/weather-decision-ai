@@ -3,6 +3,7 @@ import { afterEach, describe, it } from "node:test";
 
 import { evaluateConstructionScenarios } from "../lib/climate-scenarios";
 import { getHistoricalClimateContext } from "../lib/open-meteo";
+import { createProcessingDiagnostics } from "../lib/ticket-processing";
 
 import { analyzeDecision } from "./gemini";
 import { getWeatherSummary } from "./weather";
@@ -194,5 +195,17 @@ describe("getWeatherSummary", () => {
     assert.ok(result.bestStartMonth);
     assert.ok(result.worstStartMonth);
     assert.ok(result.recommendation.length > 0);
+  });
+
+  it("sanitizes processing diagnostics to avoid leaking secrets or personal data", () => {
+    const diagnostic = createProcessingDiagnostics(
+      new Error("Gemini failed: AIzaKey123 and user@example.com"),
+      "gemini",
+    );
+
+    assert.equal(diagnostic.errorType, "gemini_api_error");
+    assert.ok(!diagnostic.message.includes("AIzaKey123"));
+    assert.ok(!diagnostic.message.includes("user@example.com"));
+    assert.ok(diagnostic.message.includes("[redacted]"));
   });
 });

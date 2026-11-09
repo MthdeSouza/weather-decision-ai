@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { getHistoricalClimateContext } from "@/lib/open-meteo";
+import { processApprovedTicket } from "@/lib/ticket-processing";
 
 export async function POST(request: Request) {
   try {
@@ -15,6 +16,19 @@ export async function POST(request: Request) {
     }
 
     const decodedToken = await adminAuth.verifyIdToken(token);
+    const userSnapshot = await adminDb
+      .collection("users")
+      .doc(decodedToken.uid)
+      .get();
+    const userRole = userSnapshot.data()?.role ?? "basic";
+
+    if (userRole !== "admin" && userRole !== "approver") {
+      return NextResponse.json(
+        { error: "Usuário sem permissão para aprovar chamados." },
+        { status: 403 },
+      );
+    }
+
     const body = await request.json();
     const ticketId = typeof body?.ticketId === "string" ? body.ticketId : "";
 
@@ -79,7 +93,22 @@ export async function POST(request: Request) {
       updatedAt: new Date(),
     });
 
-    return NextResponse.json({ ok: true, climateContext });
+    const processingResult = await processApprovedTicket(ticketId, {
+      uid: decodedToken.uid,
+      name: decodedToken.name ?? "Usuário",
+      email: decodedToken.email ?? "",
+      role: userRole,
+    });
+
+    return NextResponse.json({
+      ok: processingResult.ok,
+      status: processingResult.status,
+      ticketId,
+      climateContext,
+      analysisId: processingResult.analysisId,
+      report: processingResult.report,
+      error: processingResult.error,
+    });
   } catch (error) {
     const message =
       error instanceof Error

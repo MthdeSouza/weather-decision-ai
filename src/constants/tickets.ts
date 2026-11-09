@@ -53,6 +53,7 @@ export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
   pending_ai_analysis: "Aguardando IA",
   processing: "Em processamento",
   completed: "Concluído",
+  failed: "Falhou na análise",
   rejected: "Reprovado",
 };
 
@@ -61,5 +62,6 @@ export const TICKET_STATUS_STYLES: Record<TicketStatus, string> = {
   pending_ai_analysis: "bg-sky-100 text-sky-700 border border-sky-200",
   processing: "bg-violet-100 text-violet-700 border border-violet-200",
   completed: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+  failed: "bg-red-100 text-red-700 border border-red-200",
   rejected: "bg-rose-100 text-rose-700 border border-rose-200",
 };

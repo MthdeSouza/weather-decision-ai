@@ -1,5 +1,3 @@
-import "server-only";
-
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -21,23 +19,38 @@ const serviceAccount =
       }
     : null;
 
-const adminApp = getApps().length
-  ? getApps()[0]
-  : initializeApp(
-      serviceAccount
-        ? {
-            credential: cert(serviceAccount),
-            projectId,
-          }
-        : {
-            projectId,
-            credential: undefined,
-          },
-    );
-
-export const adminDb = getFirestore(adminApp);
-export const adminAuth = getAuth(adminApp);
-
 export const isFirebaseAdminConfigured = Boolean(
   projectId && (serviceAccount || process.env.GOOGLE_APPLICATION_CREDENTIALS),
 );
+
+const adminApp = getApps().length
+  ? getApps()[0]
+  : isFirebaseAdminConfigured
+    ? initializeApp(
+        serviceAccount
+          ? {
+              credential: cert(serviceAccount),
+              projectId,
+            }
+          : {
+              projectId,
+              credential: undefined,
+            },
+      )
+    : null;
+
+const makeMissingFirebaseAdminProxy = <T extends object>(label: string) =>
+  new Proxy({} as T, {
+    get() {
+      throw new Error(
+        `Firebase Admin ${label} não está configurado. Defina as variáveis do Firebase Admin antes de usar o backend.`,
+      );
+    },
+  });
+
+export const adminDb = (
+  adminApp ? getFirestore(adminApp) : makeMissingFirebaseAdminProxy("Firestore")
+) as any;
+export const adminAuth = (
+  adminApp ? getAuth(adminApp) : makeMissingFirebaseAdminProxy("Auth")
+) as any;

@@ -5,6 +5,7 @@ export type TicketStatus =
   | "pending_ai_analysis"
   | "processing"
   | "completed"
+  | "failed"
   | "rejected";
 
 export type PropertyType =
