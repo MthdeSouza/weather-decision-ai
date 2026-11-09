@@ -6,7 +6,8 @@ export type TicketStatus =
   | "processing"
   | "completed"
   | "failed"
-  | "rejected";
+  | "rejected"
+  | "archived";
 
 export type PropertyType =
   | "residential"
@@ -91,6 +92,9 @@ export interface Ticket {
   createdBy: TicketUserRef;
   construction: TicketConstruction;
   status: TicketStatus;
+  previousStatus?: TicketStatus | null;
+  archivedBy?: TicketUserRef | null;
+  archivedAt?: Timestamp | null;
   approval: TicketApproval;
   iaAnalysis: string | null;
   aiAnalysisMeta: TicketAiAnalysisMeta | null;

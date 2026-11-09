@@ -22,6 +22,23 @@ import type { UserRole } from "@/types/user";
 
 const ticketsCollection = collection(db, "tickets");
 
+const getTimestampMillis = (value: unknown) => {
+  if (!value) {
+    return 0;
+  }
+
+  if (typeof value === "object" && value !== null && "toDate" in value) {
+    return (value as { toDate: () => Date }).toDate().getTime();
+  }
+
+  if (typeof value === "object" && value !== null && "seconds" in value) {
+    return new Date((value as { seconds: number }).seconds * 1000).getTime();
+  }
+
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+};
+
 export async function getCurrentAuthUser() {
   const currentUser = auth.currentUser;
 
@@ -92,23 +109,6 @@ export async function createTicket(input: TicketCreateInput) {
   return payload;
 }
 
-const getTimestampMillis = (value: unknown) => {
-  if (!value) {
-    return 0;
-  }
-
-  if (typeof value === "object" && value !== null && "toDate" in value) {
-    return (value as { toDate: () => Date }).toDate().getTime();
-  }
-
-  if (typeof value === "object" && value !== null && "seconds" in value) {
-    return new Date((value as { seconds: number }).seconds * 1000).getTime();
-  }
-
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-};
-
 export async function getMyTickets() {
   const user = auth.currentUser;
 
@@ -121,6 +121,7 @@ export async function getMyTickets() {
   const snapshot = await getDocs(q);
 
   return snapshot.docs
+    .filter((doc) => (doc.data() as Ticket)?.status !== "archived")
     .map((ticketDoc) => {
       const { id: _ignoredId, ...ticketData } = ticketDoc.data() as Ticket;
 
@@ -141,6 +142,7 @@ export async function getPendingApprovalTickets() {
   const snapshot = await getDocs(q);
 
   return snapshot.docs
+    .filter((doc) => (doc.data() as Ticket)?.status !== "archived")
     .map((ticketDoc) => {
       const { id: _ignoredId, ...ticketData } = ticketDoc.data() as Ticket;
 
@@ -181,6 +183,10 @@ export function calculateTicketDashboardStats(
   const stats = { ...emptyTicketDashboardStats };
 
   for (const ticket of tickets) {
+    if (ticket.status === "archived") {
+      continue;
+    }
+
     stats.total += 1;
 
     if (ticket.status === "pending_approval") {
@@ -229,11 +235,41 @@ export async function getDashboardTickets(): Promise<Ticket[]> {
     ? ticketsCollection
     : query(ticketsCollection, where("createdBy.uid", "==", profile.uid));
 
-  const snapshot = isPrivileged
-    ? await getDocs(q as never)
-    : await getDocs(q as typeof q);
+  const snapshot = await getDocs(q as never);
 
   return snapshot.docs
+    .filter((doc) => (doc.data() as Ticket)?.status !== "archived")
+    .map((ticketDoc) => {
+      const { id: _ignoredId, ...ticketData } = ticketDoc.data() as Ticket;
+
+      return {
+        ...ticketData,
+        id: ticketDoc.id,
+      } as Ticket;
+    })
+    .sort(
+      (a, b) =>
+        getTimestampMillis(b.createdAt) - getTimestampMillis(a.createdAt),
+    );
+}
+
+export async function getAllTicketsForReview(): Promise<Ticket[]> {
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    return [];
+  }
+
+  const profile = await getCurrentAuthUser();
+
+  if (!profile || (profile.role !== "approver" && profile.role !== "admin")) {
+    return [];
+  }
+
+  const snapshot = await getDocs(ticketsCollection);
+
+  return snapshot.docs
+    .filter((doc) => (doc.data() as Ticket)?.status !== "archived")
     .map((ticketDoc) => {
       const { id: _ignoredId, ...ticketData } = ticketDoc.data() as Ticket;
 
@@ -262,6 +298,31 @@ export async function getTicketById(ticketId: string) {
     ...ticketData,
     id: snapshot.id,
   } as Ticket;
+}
+
+export async function archiveTicket(
+  ticketId: string,
+  actor: TicketDecisionInput["reviewer"],
+) {
+  const ticketRef = doc(db, "tickets", ticketId);
+  const snapshot = await getDoc(ticketRef);
+
+  if (!snapshot.exists()) {
+    throw new Error("Chamado não encontrado.");
+  }
+
+  const currentTicket = snapshot.data() as Ticket;
+
+  await updateDoc(ticketRef, {
+    status: "archived",
+    previousStatus:
+      currentTicket.status === "archived"
+        ? (currentTicket.previousStatus ?? currentTicket.status)
+        : currentTicket.status,
+    archivedBy: actor,
+    archivedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function approveTicket(
@@ -302,3 +363,6 @@ export async function rejectTicket(
     updatedAt: serverTimestamp(),
   });
 }
+
+export { filterAndSortTickets } from "./ticket-filters";
+export type { TicketFilterOptions, TicketSortOption } from "./ticket-filters";

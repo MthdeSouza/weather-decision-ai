@@ -10,6 +10,29 @@ import { auth } from "@/services/firebase/config";
 import { getCurrentAuthUser, getMyTickets } from "@/services/tickets";
 import type { Ticket, TicketStatus } from "@/types/ticket";
 
+const safeParseReport = (ticket: Ticket | null) => {
+  if (!ticket) {
+    return null;
+  }
+
+  if (
+    ticket.aiAnalysisMeta?.result &&
+    typeof ticket.aiAnalysisMeta.result === "object"
+  ) {
+    return ticket.aiAnalysisMeta.result as Record<string, unknown>;
+  }
+
+  if (!ticket.iaAnalysis?.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(ticket.iaAnalysis) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
 export default function MyTicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [statusFilter, setStatusFilter] = useState<"all" | TicketStatus>("all");
@@ -17,6 +40,7 @@ export default function MyTicketsPage() {
   const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
 
   const loadTickets = async () => {
     setLoading(true);
@@ -51,6 +75,124 @@ export default function MyTicketsPage() {
 
     return tickets.filter((ticket) => ticket.status === statusFilter);
   }, [statusFilter, tickets]);
+
+  useEffect(() => {
+    if (filteredTickets.length === 0) {
+      setSelectedTicketId(null);
+      return;
+    }
+
+    if (
+      !selectedTicketId ||
+      !filteredTickets.some((item) => item.id === selectedTicketId)
+    ) {
+      setSelectedTicketId(filteredTickets[0].id);
+    }
+  }, [filteredTickets, selectedTicketId]);
+
+  const selectedTicket = useMemo(
+    () =>
+      filteredTickets.find((ticket) => ticket.id === selectedTicketId) ??
+      filteredTickets[0] ??
+      null,
+    [filteredTickets, selectedTicketId],
+  );
+
+  const reportData = useMemo(
+    () => safeParseReport(selectedTicket),
+    [selectedTicket],
+  );
+
+  const originalPlan = (reportData?.originalPlan ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const stageAnalysis = Array.isArray(reportData?.stageAnalysis)
+    ? (reportData?.stageAnalysis as Array<Record<string, unknown>>)
+    : [];
+  const constructionAlternatives = Array.isArray(
+    reportData?.constructionAlternatives,
+  )
+    ? (reportData?.constructionAlternatives as Array<Record<string, unknown>>)
+    : [];
+  const recommendations = Array.isArray(reportData?.recommendations)
+    ? (reportData?.recommendations as string[])
+    : [];
+  const limitations = Array.isArray(reportData?.limitations)
+    ? (reportData?.limitations as string[])
+    : [];
+  const dataSources = Array.isArray(reportData?.dataSources)
+    ? (reportData?.dataSources as string[])
+    : [];
+
+  const executiveSummary = reportData?.executiveSummary
+    ? String(reportData.executiveSummary)
+    : selectedTicket?.iaAnalysis?.trim()
+      ? "Relatório em processamento ou não disponível em formato JSON."
+      : "Ainda não há análise da IA concluída para este ticket.";
+
+  const climateSummary = selectedTicket?.climateContext?.summary;
+  const climateBars = climateSummary
+    ? [
+        {
+          label: "Precipitação",
+          value: Number(climateSummary.precipitationAverageMm ?? 0),
+          unit: "mm",
+          colorClass: "bg-sky-500",
+        },
+        {
+          label: "Temperatura",
+          value: Number(climateSummary.averageTemperatureC ?? 0),
+          unit: "°C",
+          colorClass: "bg-amber-500",
+        },
+        {
+          label: "Umidade",
+          value: Number(climateSummary.averageHumidityPercent ?? 0),
+          unit: "%",
+          colorClass: "bg-emerald-500",
+        },
+        {
+          label: "Rajadas",
+          value: Number(climateSummary.strongGustDays ?? 0),
+          unit: " dias",
+          colorClass: "bg-violet-500",
+        },
+      ]
+    : [];
+
+  const scenarioBars = Array.isArray(reportData?.alternativeStartDates)
+    ? (reportData?.alternativeStartDates as Array<Record<string, unknown>>).map(
+        (item) => ({
+          label: String(item.startMonth ?? "-"),
+          value: Number(item.score ?? 0),
+          unit: " pts",
+          colorClass: "bg-cyan-500",
+        }),
+      )
+    : [];
+
+  const stageBars = Array.isArray(reportData?.stageAnalysis)
+    ? (reportData?.stageAnalysis as Array<Record<string, unknown>>).map(
+        (item) => ({
+          label: String(item.name ?? "-"),
+          value: Number(item.climateSensitivity ?? 0),
+          unit: "x",
+          colorClass:
+            Number(item.climateSensitivity ?? 0) > 1.2
+              ? "bg-rose-500"
+              : Number(item.climateSensitivity ?? 0) > 0.8
+                ? "bg-amber-500"
+                : "bg-emerald-500",
+        }),
+      )
+    : [];
+
+  const recommendedScenario = Array.isArray(reportData?.alternativeStartDates)
+    ? (
+        reportData?.alternativeStartDates as Array<Record<string, unknown>>
+      ).sort((a, b) => Number(a.score ?? 0) - Number(b.score ?? 0))[0]
+    : null;
 
   if (!isAuthenticated) {
     return (
@@ -101,7 +243,7 @@ export default function MyTicketsPage() {
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center justify-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-500"
+              className="cursor-pointer inline-flex items-center justify-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-500"
             >
               Abrir chamado
             </button>
@@ -130,12 +272,496 @@ export default function MyTicketsPage() {
             </select>
           </div>
 
-          <TicketList
-            loading={loading}
-            tickets={filteredTickets}
-            emptyTitle="Nenhum chamado encontrado"
-            emptyDescription="Ainda não há chamados neste filtro. Clique em “Abrir chamado” para começar."
-          />
+          <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+            <div className="min-w-0">
+              <TicketList
+                loading={loading}
+                tickets={filteredTickets}
+                selectedTicketId={selectedTicketId}
+                onSelectTicket={setSelectedTicketId}
+                emptyTitle="Nenhum chamado encontrado"
+                emptyDescription="Ainda não há chamados neste filtro. Clique em “Abrir chamado” para começar."
+              />
+            </div>
+
+            <div className="min-w-0 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-950">
+              {selectedTicket ? (
+                <div className="space-y-6">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-300">
+                        Chamado selecionado
+                      </p>
+                      <h3 className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-50">
+                        {selectedTicket.construction.city} /{" "}
+                        {selectedTicket.construction.state}
+                      </h3>
+                    </div>
+                    <span className="rounded-full bg-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                      {selectedTicket.status}
+                    </span>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                        Imóvel
+                      </p>
+                      <p className="mt-2 font-medium text-slate-900 dark:text-slate-50">
+                        {selectedTicket.construction.propertyType}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                        Construção
+                      </p>
+                      <p className="mt-2 font-medium text-slate-900 dark:text-slate-50">
+                        {selectedTicket.construction.constructionType}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                        Início da obra
+                      </p>
+                      <p className="mt-2 font-medium text-slate-900 dark:text-slate-50">
+                        {selectedTicket.construction.startDate || "-"}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                        Área
+                      </p>
+                      <p className="mt-2 font-medium text-slate-900 dark:text-slate-50">
+                        {selectedTicket.construction.builtArea} m²
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/30">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-700 dark:text-sky-300">
+                      IA + recomendações
+                    </p>
+                    <p className="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-200">
+                      {executiveSummary}
+                    </p>
+                  </div>
+
+                  {selectedTicket.status === "processing" ? (
+                    <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-700 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-200">
+                      Processamento em andamento. A IA está avaliando clima,
+                      riscos e cenários do projeto.
+                    </div>
+                  ) : null}
+
+                  {selectedTicket.status === "failed" ? (
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+                      A análise falhou. Os diagnósticos de processamento foram
+                      registrados no backend sem expor dados sensíveis.
+                    </div>
+                  ) : null}
+
+                  {selectedTicket.approval.rejectionReason ? (
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900 dark:bg-rose-950/30">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-rose-700 dark:text-rose-300">
+                        Motivo da rejeição
+                      </p>
+                      <p className="mt-3 text-sm text-rose-800 dark:text-rose-100">
+                        {selectedTicket.approval.rejectionReason}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {reportData ? (
+                    <>
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-300">
+                            Dados históricos
+                          </p>
+                          <h3 className="mt-3 text-xl font-bold text-slate-900 dark:text-slate-50">
+                            Indicadores climáticos do período
+                          </h3>
+                          {climateBars.length > 0 ? (
+                            <div className="mt-4 space-y-4">
+                              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
+                                <div className="space-y-4">
+                                  {climateBars.map((item) => (
+                                    <div key={item.label}>
+                                      <div className="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                                        <span>{item.label}</span>
+                                        <span>
+                                          {item.value}
+                                          {item.unit ?? ""}
+                                        </span>
+                                      </div>
+                                      <div className="h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                                        <div
+                                          className={`h-full rounded-full ${item.colorClass}`}
+                                          style={{
+                                            width: `${Math.max(8, Math.min(100, item.value * 2))}%`,
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
+                              Dados climáticos não disponíveis para este
+                              chamado.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-300">
+                            IA + recomendações
+                          </p>
+                          <h3 className="mt-3 text-xl font-bold text-slate-900 dark:text-slate-50">
+                            Resumo executivo
+                          </h3>
+                          <p className="mt-4 text-sm leading-7 text-slate-700 dark:text-slate-200">
+                            {String(
+                              reportData.executiveSummary ??
+                                "Sem resumo disponível.",
+                            )}
+                          </p>
+                          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                            Recomendações geradas pela IA exigem validação
+                            profissional antes de virar decisão final.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                            Informações da obra
+                          </h3>
+                          <dl className="mt-4 grid gap-4 sm:grid-cols-2 text-sm text-slate-700 dark:text-slate-200">
+                            <div>
+                              <dt className="text-slate-500 dark:text-slate-400">
+                                Cidade
+                              </dt>
+                              <dd className="mt-1 font-medium">
+                                {String(
+                                  originalPlan.city ??
+                                    selectedTicket.construction.city,
+                                )}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-slate-500 dark:text-slate-400">
+                                Estado
+                              </dt>
+                              <dd className="mt-1 font-medium">
+                                {String(
+                                  originalPlan.state ??
+                                    selectedTicket.construction.state,
+                                )}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-slate-500 dark:text-slate-400">
+                                Tipo do imóvel
+                              </dt>
+                              <dd className="mt-1 font-medium">
+                                {String(
+                                  originalPlan.propertyType ??
+                                    selectedTicket.construction.propertyType,
+                                )}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-slate-500 dark:text-slate-400">
+                                Tipo de construção
+                              </dt>
+                              <dd className="mt-1 font-medium">
+                                {String(
+                                  originalPlan.constructionType ??
+                                    selectedTicket.construction
+                                      .constructionType,
+                                )}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-slate-500 dark:text-slate-400">
+                                Área
+                              </dt>
+                              <dd className="mt-1 font-medium">
+                                {String(
+                                  originalPlan.builtArea ??
+                                    selectedTicket.construction.builtArea,
+                                )}{" "}
+                                m²
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-slate-500 dark:text-slate-400">
+                                Previsão de início
+                              </dt>
+                              <dd className="mt-1 font-medium">
+                                {String(
+                                  originalPlan.startDate ??
+                                    selectedTicket.construction.startDate,
+                                )}
+                              </dd>
+                            </div>
+                          </dl>
+                        </div>
+
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                            Avaliação climática
+                          </h3>
+                          <p className="mt-4 text-sm leading-7 text-slate-700 dark:text-slate-200">
+                            {String(
+                              reportData.climateOverview ??
+                                "Sem avaliação climática disponível.",
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                            Riscos por etapa
+                          </h3>
+                          {stageAnalysis.length > 0 ? (
+                            <div className="mt-4 space-y-4">
+                              {stageAnalysis.map((stage) => (
+                                <div
+                                  key={String(stage.name ?? "-")}
+                                  className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950"
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="font-medium text-slate-900 dark:text-slate-50">
+                                      {String(stage.name ?? "-")}
+                                    </span>
+                                    <span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                                      {String(stage.riskLevel ?? "medium")}
+                                    </span>
+                                  </div>
+                                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                                    {String(stage.summary ?? "-")}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
+                              Sem estágio de obra avaliado pela IA.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                            Comparação dos cenários
+                          </h3>
+                          {scenarioBars.length > 0 ? (
+                            <div className="mt-4 space-y-4">
+                              {scenarioBars.map((item) => (
+                                <div key={item.label}>
+                                  <div className="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                                    <span>{item.label}</span>
+                                    <span>
+                                      {item.value}
+                                      {item.unit ?? ""}
+                                    </span>
+                                  </div>
+                                  <div className="h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                                    <div
+                                      className={`h-full rounded-full ${item.colorClass}`}
+                                      style={{
+                                        width: `${Math.max(8, Math.min(100, item.value * 2))}%`,
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
+                              Sem comparação de cenários disponível.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                            Data recomendada e justificativa
+                          </h3>
+                          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+                            {recommendedScenario ? (
+                              <>
+                                <div className="font-semibold">
+                                  {String(
+                                    recommendedScenario.startMonth ?? "-",
+                                  )}
+                                </div>
+                                <p className="mt-2">
+                                  {String(
+                                    recommendedScenario.rationale ??
+                                      "Sem justificativa detalhada.",
+                                  )}
+                                </p>
+                              </>
+                            ) : (
+                              <p>
+                                Sem recomendação objetiva disponível para a data
+                                de início.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                            Exposição climática por etapa
+                          </h3>
+                          {stageBars.length > 0 ? (
+                            <div className="mt-4 space-y-4">
+                              {stageBars.map((item) => (
+                                <div key={item.label}>
+                                  <div className="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                                    <span>{item.label}</span>
+                                    <span>
+                                      {item.value}
+                                      {item.unit ?? ""}
+                                    </span>
+                                  </div>
+                                  <div className="h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                                    <div
+                                      className={`h-full rounded-full ${item.colorClass}`}
+                                      style={{
+                                        width: `${Math.max(8, Math.min(100, item.value * 20))}%`,
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
+                              Sem dados consolidados por etapa.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                            Recomendações de otimização
+                          </h3>
+                          <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-700 dark:text-slate-200">
+                            {recommendations.length > 0 ? (
+                              recommendations.map((recommendation) => (
+                                <li key={recommendation}>{recommendation}</li>
+                              ))
+                            ) : (
+                              <li>Sem recomendações detalhadas.</li>
+                            )}
+                          </ul>
+                        </div>
+
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                            Alternativas construtivas
+                          </h3>
+                          <div className="mt-4 space-y-3">
+                            {constructionAlternatives.length > 0 ? (
+                              constructionAlternatives.map((alternative) => (
+                                <div
+                                  key={String(
+                                    alternative.title ?? "Alternativa",
+                                  )}
+                                  className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950"
+                                >
+                                  <p className="font-medium text-slate-900 dark:text-slate-50">
+                                    {String(alternative.title ?? "-")}
+                                  </p>
+                                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                                    {String(alternative.description ?? "-")}
+                                  </p>
+                                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                    {alternative.validationRequired
+                                      ? "Validação profissional obrigatória"
+                                      : "Validação recomendada"}
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-sm text-slate-600 dark:text-slate-300">
+                                Sem alternativas construtivas disponíveis.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                            Limitações da análise
+                          </h3>
+                          <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-700 dark:text-slate-200">
+                            {limitations.length > 0 ? (
+                              limitations.map((limitation) => (
+                                <li key={limitation}>{limitation}</li>
+                              ))
+                            ) : (
+                              <li>Sem limitações identificadas.</li>
+                            )}
+                          </ul>
+                        </div>
+
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                            Fontes de dados
+                          </h3>
+                          <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                            {dataSources.length > 0 ? (
+                              dataSources.map((source) => (
+                                <li
+                                  key={source}
+                                  className="rounded-xl border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-950"
+                                >
+                                  {source}
+                                </li>
+                              ))
+                            ) : (
+                              <li>Sem fontes cadastradas.</li>
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900">
+                      <p className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                        Aguardando relatório da IA
+                      </p>
+                      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                        O chamado foi registrado, mas ainda não há análise
+                        climatológica concluída.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+                  Selecione um chamado para visualizar os detalhes.
+                </div>
+              )}
+            </div>
+          </div>
         </section>
       </section>
 
@@ -150,7 +776,7 @@ export default function MyTicketsPage() {
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="cursor-pointer rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Fechar
               </button>

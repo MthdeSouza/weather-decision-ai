@@ -203,7 +203,7 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
           <button
             type="button"
             onClick={() => setIsStateOpen((current) => !current)}
-            className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm text-slate-900 outline-none transition focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="cursor-pointer flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm text-slate-900 outline-none transition focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           >
             <span>
               {stateOptions.find((option) => option.sigla === form.state)
@@ -240,7 +240,7 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
                         setIsStateOpen(false);
                         setStateSearch("");
                       }}
-                      className="block w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-sky-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                      className="cursor-pointer block w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-sky-50 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
                       {stateOption.nome} ({stateOption.sigla})
                     </button>
@@ -262,7 +262,7 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
             type="button"
             disabled={!form.state || isLoadingCities}
             onClick={() => setIsCityOpen((current) => !current)}
-            className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm text-slate-900 outline-none transition focus:border-sky-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="cursor-pointer flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm text-slate-900 outline-none transition focus:border-sky-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           >
             <span>
               {isLoadingCities
@@ -296,7 +296,7 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
                         setIsCityOpen(false);
                         setCitySearch("");
                       }}
-                      className="block w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-sky-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                      className="cursor-pointerblock w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-sky-50 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
                       {availableCity}
                     </button>

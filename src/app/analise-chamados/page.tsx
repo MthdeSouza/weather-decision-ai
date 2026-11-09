@@ -214,7 +214,7 @@ export default function AnalysisPage() {
                     type="button"
                     onClick={() => setSelectedTicketId(ticket.id)}
                     className={[
-                      "w-full rounded-2xl border p-4 text-left transition",
+                      "cursor-pointer w-full rounded-2xl border p-4 text-left transition",
                       selectedTicketId === ticket.id
                         ? "border-sky-500 bg-sky-50 dark:border-sky-400 dark:bg-sky-500/5"
                         : "border-slate-200 bg-slate-50 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600",
@@ -351,14 +351,14 @@ export default function AnalysisPage() {
                   <button
                     type="button"
                     onClick={() => handleApprove(selectedTicket.id)}
-                    className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                    className="cursor-pointer rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"
                   >
                     Aprovar
                   </button>
                   <button
                     type="button"
                     onClick={() => handleReject(selectedTicket.id)}
-                    className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
+                    className="cursor-pointer rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
                   >
                     Reprovar
                   </button>

@@ -462,7 +462,7 @@ A resposta deve ser um objeto JSON estruturado, sem markdown e sem comentários.
   } as const;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-3.8-flash",
     config: {
       responseMimeType: "application/json",
       responseSchema: responseSchema as never,
@@ -490,7 +490,10 @@ A resposta deve ser um objeto JSON estruturado, sem markdown e sem comentários.
   }
 
   const parsed = JSON.parse(
-    rawText.replace(/^```json\s*/i, "").replace(/\s*```$/, "").trim(),
+    rawText
+      .replace(/^```json\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim(),
   );
 
   return ConstructionAnalysisReportSchema.parse(parsed);
@@ -545,7 +548,7 @@ export async function analyzeDecision(
     console.log("[gemini] prompt", prompt);
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
     });
 

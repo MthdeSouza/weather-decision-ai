@@ -24,6 +24,12 @@ const navItems: Array<{
     protected: true,
     allowedRoles: ["approver", "admin"],
   },
+  {
+    label: "Gerenciamento de chamados",
+    href: "/gerenciamento",
+    protected: true,
+    allowedRoles: ["approver", "admin"],
+  },
   { label: "Futuro", href: "/future", protected: true },
   { label: "AIChat", href: "/ai-chat", protected: true },
 ];

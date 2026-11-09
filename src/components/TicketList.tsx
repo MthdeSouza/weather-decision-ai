@@ -94,7 +94,7 @@ export function TicketList({
             type="button"
             onClick={() => onSelectTicket?.(ticket.id)}
             className={[
-              "w-full rounded-2xl border p-4 text-left transition",
+              "cursor-pointer w-full rounded-2xl border p-4 text-left transition",
               isSelected
                 ? "border-sky-500 bg-sky-50 shadow-sm dark:border-sky-400 dark:bg-sky-500/5"
                 : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600",
@@ -166,15 +166,6 @@ export function TicketList({
                   <div>{ticket.approval.rejectionReason || "-"}</div>
                 </div>
               ) : null}
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50/70 p-3 dark:border-sky-900/80 dark:bg-sky-950/40">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-700 dark:text-sky-300">
-                Análise da IA
-              </p>
-              <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
-                {ticket.iaAnalysis?.trim() || "Aguardando análise da IA."}
-              </p>
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400">

@@ -28,7 +28,7 @@ export function GoogleLoginButton({
     <button
       type="button"
       onClick={handleLogin}
-      className="flex w-full items-center justify-center gap-3 rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-500"
+      className="cursor-pointer flex w-full items-center justify-center gap-3 rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-500"
     >
       <span aria-hidden="true">G</span>
       Entrar com Google

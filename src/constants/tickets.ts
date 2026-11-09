@@ -55,6 +55,7 @@ export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
   completed: "Concluído",
   failed: "Falhou na análise",
   rejected: "Reprovado",
+  archived: "Arquivado",
 };
 
 export const TICKET_STATUS_STYLES: Record<TicketStatus, string> = {
@@ -64,4 +65,5 @@ export const TICKET_STATUS_STYLES: Record<TicketStatus, string> = {
   completed: "bg-emerald-100 text-emerald-700 border border-emerald-200",
   failed: "bg-red-100 text-red-700 border border-red-200",
   rejected: "bg-rose-100 text-rose-700 border border-rose-200",
+  archived: "bg-slate-200 text-slate-700 border border-slate-300",
 };

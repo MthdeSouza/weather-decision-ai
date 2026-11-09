@@ -175,7 +175,7 @@ export function Chat() {
             <button
               type="button"
               onClick={() => setIsStateOpen((previous) => !previous)}
-              className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-800 transition focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="cursor-pointer flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-800 transition focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             >
               <span>
                 {stateOptions.find((option) => option.sigla === selectedState)
@@ -212,7 +212,7 @@ export function Chat() {
                           setIsStateOpen(false);
                           setStateSearch("");
                         }}
-                        className="block w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-sky-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                        className="cursor-pointer block w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-sky-50 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
                         {stateOption.nome}
                       </button>
@@ -226,7 +226,7 @@ export function Chat() {
             <button
               type="button"
               onClick={() => setIsCityOpen((previous) => !previous)}
-              className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-800 transition focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="cursor-pointer flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-800 transition focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             >
               <span>{city || "Selecione a cidade"}</span>
               <span>▾</span>
@@ -256,7 +256,7 @@ export function Chat() {
                           setIsCityOpen(false);
                           setCitySearch("");
                         }}
-                        className="block w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-sky-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                        className="cursor-pointer block w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-sky-50 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
                         {availableCity}
                       </button>

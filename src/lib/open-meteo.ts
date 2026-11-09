@@ -54,6 +54,10 @@ async function fetchJson<T>(url: string): Promise<T> {
   });
 
   if (!response.ok) {
+    const curl = `curl -X GET '${url}' -H 'Accept: application/json'`;
+
+    console.log("[Open-Meteo] Erro Executing request:");
+    console.log(curl);
     throw new Error(
       `Open-Meteo request failed (${response.status}) for ${url}`,
     );
@@ -187,10 +191,14 @@ export async function getHistoricalClimateContext(input: {
 }): Promise<HistoricalClimateContext> {
   const normalizedStart = input.startDate ?? toIsoDate(new Date());
   const startDate = new Date(`${normalizedStart}T00:00:00`);
-  const endDate = new Date(startDate);
-  endDate.setFullYear(endDate.getFullYear());
+  const today = new Date();
+  const safeEndDate = new Date(startDate);
 
-  const historicalStart = new Date(startDate);
+  if (safeEndDate > today) {
+    safeEndDate.setTime(today.getTime());
+  }
+
+  const historicalStart = new Date(safeEndDate);
   historicalStart.setFullYear(historicalStart.getFullYear() - 3);
 
   const cacheKey = `${normalizeString(input.city)}|${normalizeString(input.state ?? "")}|${toIsoDate(startDate)}`;
@@ -205,7 +213,7 @@ export async function getHistoricalClimateContext(input: {
     archiveUrl.searchParams.set("latitude", String(location.latitude));
     archiveUrl.searchParams.set("longitude", String(location.longitude));
     archiveUrl.searchParams.set("start_date", toIsoDate(historicalStart));
-    archiveUrl.searchParams.set("end_date", toIsoDate(endDate));
+    archiveUrl.searchParams.set("end_date", toIsoDate(safeEndDate));
     archiveUrl.searchParams.set(
       "daily",
       [
@@ -220,7 +228,7 @@ export async function getHistoricalClimateContext(input: {
       ].join(","),
     );
     archiveUrl.searchParams.set("timezone", "auto");
-    archiveUrl.searchParams.set("models", "ERA5_LAND");
+    archiveUrl.searchParams.set("models", "era5_land");
 
     const payload = await fetchJson<{
       daily?: {
@@ -283,7 +291,7 @@ export async function getHistoricalClimateContext(input: {
       source: "Open-Meteo Historical Weather API (ERA5-Land)",
       period: {
         startDate: toIsoDate(historicalStart),
-        endDate: toIsoDate(endDate),
+        endDate: toIsoDate(safeEndDate),
         daysAnalyzed: entries.length,
       },
       summary: {

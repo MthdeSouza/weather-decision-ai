@@ -67,14 +67,25 @@ export async function beginTicketProcessing(
     const currentStatus =
       typeof ticket.status === "string" ? ticket.status : "";
 
-    if (currentStatus === "completed") {
-      throw new Error(
-        "Este chamado já foi concluído e não pode ser processado novamente.",
-      );
-    }
+    const allowsReanalysis = [
+      "rejected",
+      "failed",
+      "pending_ai_analysis",
+      "completed",
+    ].includes(currentStatus);
 
     if (currentStatus === "processing") {
       throw new Error("Este chamado já está em processamento.");
+    }
+
+    if (
+      currentStatus &&
+      !allowsReanalysis &&
+      currentStatus !== "pending_approval"
+    ) {
+      throw new Error(
+        `Este chamado não está em um status elegível para nova análise: ${currentStatus}.`,
+      );
     }
 
     transaction.update(ticketRef, {
@@ -87,6 +98,9 @@ export async function beginTicketProcessing(
         role: actor.role ?? "approver",
       },
       processingStartedAt: new Date(),
+      iaAnalysis: allowsReanalysis ? null : (ticket.iaAnalysis ?? null),
+      aiAnalysisMeta: allowsReanalysis ? null : (ticket.aiAnalysisMeta ?? null),
+      processingDiagnostics: null,
       updatedAt: new Date(),
     });
   });
@@ -120,7 +134,7 @@ export async function finalizeTicketAnalysis(
       aiAnalysisMeta: {
         id: `analysis-${Date.now()}`,
         executedAt: new Date().toISOString(),
-        model: "gemini-2.0-flash",
+        model: "gemini-3.8-flash",
         promptVersion: AI_ANALYSIS_PROMPT_VERSION,
         dataSources: [
           "Open-Meteo Historical Weather API (ERA5-LAND)",
