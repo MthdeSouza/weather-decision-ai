@@ -46,6 +46,7 @@ export default function MyTicketsPage() {
   // const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [creationNotice, setCreationNotice] = useState("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const pendingApprovalCount = tickets.filter(
     (ticket) => ticket.status === "pending_approval",
@@ -309,6 +310,14 @@ export default function MyTicketsPage() {
             ) : null}
           </div>
         </section>
+        {creationNotice ? (
+          <p
+            role="status"
+            className="shrink-0 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+          >
+            {creationNotice}
+          </p>
+        ) : null}
 
         <section className="flex min-h-0 flex-1 flex-col rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="mb-4 flex shrink-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -841,8 +850,13 @@ export default function MyTicketsPage() {
 
             <div className="p-6">
               <TicketForm
-                onCreated={() => {
+                onCreated={(notificationSent) => {
                   setIsModalOpen(false);
+                  setCreationNotice(
+                    notificationSent
+                      ? ""
+                      : "O chamado foi criado, mas a notificação por e-mail não foi enviada. Avise o administrador do sistema.",
+                  );
                   void loadTickets();
                 }}
               />

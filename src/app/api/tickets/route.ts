@@ -6,6 +6,7 @@ import {
   ApiRequestError,
   requireFirebaseActor,
 } from "@/lib/api-auth";
+import { sendPendingApprovalNotification } from "@/lib/approval-email";
 import { adminDb } from "@/lib/firebase-admin";
 import {
   canCreatePendingApprovalTicket,
@@ -115,8 +116,27 @@ export async function POST(request: Request) {
       transaction.create(ticketRef, ticket);
     });
 
+    let notificationSent = true;
+    if (status === "pending_approval") {
+      try {
+        await sendPendingApprovalNotification({
+          ticketId: ticketRef.id,
+          requesterName: actor.name,
+          requesterEmail: actor.email,
+          city: input.city,
+          state: input.state,
+        });
+      } catch (error) {
+        console.error("[api:ticket-creation] approval notification failed", {
+          ticketId: ticketRef.id,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        notificationSent = false;
+      }
+    }
+
     return NextResponse.json(
-      { ok: true, ticketId: ticketRef.id },
+      { ok: true, ticketId: ticketRef.id, notificationSent },
       { status: 201 },
     );
   } catch (error) {

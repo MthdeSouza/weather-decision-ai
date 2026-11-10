@@ -21,7 +21,11 @@ const initialState: TicketCreateInput = {
   builtArea: 0,
 };
 
-export function TicketForm({ onCreated }: { onCreated?: () => void }) {
+export function TicketForm({
+  onCreated,
+}: {
+  onCreated?: (notificationSent: boolean) => void;
+}) {
   const [form, setForm] = useState<TicketCreateInput>(initialState);
   const [errors, setErrors] = useState<
     Partial<Record<keyof TicketCreateInput, string>>
@@ -185,10 +189,14 @@ export function TicketForm({ onCreated }: { onCreated?: () => void }) {
     setErrorMessage("");
 
     try {
-      await createTicket(form);
-      setSuccessMessage("Chamado cadastrado com sucesso.");
+      const result = await createTicket(form);
+      setSuccessMessage(
+        result.notificationSent
+          ? "Chamado cadastrado e notificação enviada para aprovação."
+          : "Chamado cadastrado, mas não foi possível enviar a notificação por e-mail. Avise o administrador do sistema.",
+      );
       setForm(initialState);
-      onCreated?.();
+      onCreated?.(result.notificationSent);
     } catch (error) {
       setErrorMessage(
         error instanceof Error

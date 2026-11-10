@@ -75,6 +75,7 @@ export async function createTicket(input: TicketCreateInput) {
   const payload = (await response.json()) as {
     error?: string;
     ticketId?: string;
+    notificationSent?: boolean;
   };
 
   if (!response.ok) {
@@ -85,7 +86,10 @@ export async function createTicket(input: TicketCreateInput) {
     throw new Error("O servidor não confirmou a criação do chamado.");
   }
 
-  return payload.ticketId;
+  return {
+    ticketId: payload.ticketId,
+    notificationSent: payload.notificationSent === true,
+  };
 }
 
 export async function getMyTickets() {
